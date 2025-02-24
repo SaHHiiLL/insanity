@@ -6,6 +6,8 @@
 *
 */
 
+use super::peaker::Peaker;
+
 enum Token<'a> {
     Identifier(&'a str),
     Number(i64),
@@ -20,42 +22,24 @@ enum Token<'a> {
 }
 
 struct Lexer<'a> {
-    input: &'a [char],
+    input: Peaker<'a, char>,
     position: usize,
 }
 
 impl<'a> Lexer<'a> {
     fn new(input: &'a [char]) -> Self {
-        Self { input, position: 0 }
+        Self {
+            input: Peaker::new(input),
+            position: 0,
+        }
     }
-
-    fn can_walk(&mut self) -> bool {
-        self.position < self.input.len()
-    }
-
-    fn walk(&mut self) {
-        self.position += 1;
-    }
-
-    fn curr_char(&mut self) -> char {
-        self.input[self.position]
-    }
-
-    fn peak(&self) -> char {
-        self.input[self.position + 1]
-    }
-
-    fn read_identifer() {}
 }
 
 impl<'a> Iterator for Lexer<'a> {
     type Item = Token<'a>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if !self.can_walk() {
-            return None;
-        }
-        let res = match self.curr_char() {
+        let res = match self.input.next()? {
             'a'..='z' | 'A'..='Z' => todo!("Identifier"),
             '0'..='9' => todo!("Number"),
             ')' => Some(Token::RightParen),
@@ -66,7 +50,6 @@ impl<'a> Iterator for Lexer<'a> {
             '\0' => None,
             _ => None,
         };
-        self.walk();
         res
     }
 }

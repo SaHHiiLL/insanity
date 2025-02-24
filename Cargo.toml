@@ -7,4 +7,4 @@ repository = "https://github.com/SaHHiiLL/insane/"
 license-file = "LICENSE"
 
 [dependencies]
-logos= "0.15.0"
+iter_tools = "0.24.0"
