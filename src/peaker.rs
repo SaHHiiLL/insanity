@@ -41,7 +41,6 @@ impl<'a, T> Peaker<'a, T> {
 
 impl<'a, T> Iterator for Peaker<'a, T> {
     type Item = &'a T;
-
     fn next(&mut self) -> Option<Self::Item> {
         let res = self.items.get(self.idx)?;
         self.idx += 1;

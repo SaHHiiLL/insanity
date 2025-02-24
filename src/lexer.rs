@@ -20,6 +20,7 @@ enum Token {
     StringLiteral(String),
     Equals,
     NotEquals,
+    InValid,
 }
 
 struct Lexer<'a> {
@@ -47,38 +48,30 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    fn read_identifer(&mut self) -> Option<String> {
-        let start_idx = self.input.idx();
-        let mut end_idx = start_idx;
-
-        while self.input.get()?.is_alphanumeric() {
-            end_idx = self.input.idx();
-            self.input.next()?;
+    fn read_identifier(&mut self) -> Option<String> {
+        let mut buffer = String::new();
+        while let Some(x) = self.input.get() {
+            if x.is_alphanumeric() {
+                buffer.push(*x);
+                self.input.next();
+            } else {
+                break;
+            }
         }
-        Some(
-            self.input
-                .slice_x_y(start_idx, end_idx)?
-                .iter()
-                .cloned()
-                .collect::<String>(),
-        )
+        Some(buffer)
     }
 
     fn read_number(&mut self) -> Option<String> {
-        let start_idx = self.input.idx();
-        let mut end_idx = start_idx;
-
-        while self.input.get()?.is_numeric() {
-            end_idx = self.input.idx();
-            self.input.next()?;
+        let mut buffer = String::new();
+        while let Some(x) = self.input.get() {
+            if x.is_ascii_digit() {
+                buffer.push(*x);
+                self.input.next();
+            } else {
+                break;
+            }
         }
-        Some(
-            self.input
-                .slice_x_y(start_idx, end_idx)?
-                .iter()
-                .cloned()
-                .collect::<String>(),
-        )
+        Some(buffer)
     }
 }
 
@@ -87,24 +80,38 @@ impl<'a> Iterator for Lexer<'a> {
 
     fn next(&mut self) -> Option<Self::Item> {
         self.skip_spaces();
-        let res = match self.input.next()? {
+        let res = match self.input.get()? {
             'a'..='z' | 'A'..='Z' => {
-                let ident = self.read_identifer()?.to_string();
-                Some(Token::Identifier(dbg!(ident.to_string())))
+                let ident = self.read_identifier()?;
+                // Return out the function, as `read_identifier` already moves the cursor to where it needs to be
+                return Some(Token::Identifier(ident));
             }
             '0'..='9' => {
-                let ident = self.read_number()?.to_string();
-                Some(Token::Identifier(dbg!(ident.to_string())))
+                let ident = self.read_number()?;
+                // Return out the function, as `read_number` already moves the cursor to where it needs to be
+                return Some(Token::Identifier(ident));
+            }
+            '"' => {
+                todo!()
             }
             ')' => Some(Token::RightParen),
             '(' => Some(Token::LeftParen),
             '}' => Some(Token::RightBrace),
             '{' => Some(Token::LeftBrace),
             '=' => Some(Token::Equals),
+            '!' => {
+                if *self.input.peak()? == '=' {
+                    self.input.next();
+                    Some(Token::NotEquals)
+                } else {
+                    Some(Token::InValid)
+                }
+            }
             ',' => Some(Token::Comma),
             '\0' => None,
-            _ => None,
+            _ => Some(Token::InValid),
         };
+        self.input.next();
         res
     }
 }
@@ -114,7 +121,7 @@ mod tests {
 
     #[test]
     fn test_lexer() {
-        let input = "(){()}=".chars().collect::<Vec<char>>();
+        let input = "(){()}=!=".chars().collect::<Vec<char>>();
         let lexer = Lexer::new(&input);
         let expected = &[
             Token::LeftParen,
@@ -124,10 +131,26 @@ mod tests {
             Token::RightParen,
             Token::RightBrace,
             Token::Equals,
+            Token::NotEquals,
         ];
 
         let lexed_tokens: Vec<Token> = lexer.collect();
         assert_eq!(lexed_tokens.len(), expected.len());
+        assert_eq!(lexed_tokens, expected);
+    }
+
+    #[test]
+    fn test_ident() {
+        let input = "heloo () worlkd".chars().collect::<Vec<char>>();
+        let lexer = Lexer::new(&input);
+        let expected = &[
+            Token::Identifier("heloo".to_string()),
+            Token::LeftParen,
+            Token::RightParen,
+            Token::Identifier("worlkd".to_string()),
+        ];
+
+        let lexed_tokens: Vec<Token> = lexer.collect();
         assert_eq!(lexed_tokens, expected);
     }
 }
