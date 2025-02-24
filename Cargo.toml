@@ -1,0 +1,9 @@
+[package]
+name = "insanity"
+version = "0.1.0"
+edition = "2021"
+description = "A short description of my package"
+repository = "https://github.com/SaHHiiLL/insane/"
+license-file = "LICENSE"
+
+[dependencies]
