@@ -9,7 +9,7 @@
 use super::peaker::Peaker;
 
 #[derive(Debug, PartialEq, Eq)]
-enum Token {
+pub enum Token {
     Identifier(String),
     Number(i64),
     RightParen,
@@ -18,30 +18,26 @@ enum Token {
     LeftBrace,
     Comma,
     StringLiteral(String),
-    Equals,
+    Assign,
     NotEquals,
     InValid,
 }
 
-struct Lexer<'a> {
+pub struct Lexer<'a> {
     input: Peaker<'a, char>,
 }
 
 impl<'a> Lexer<'a> {
-    fn new(input: &'a [char]) -> Self {
+    pub fn new(input: &'a [char]) -> Self {
         Self {
             input: Peaker::new(input),
         }
     }
 
     fn skip_spaces(&mut self) {
-        loop {
-            if let Some(x) = self.input.get() {
-                if x.is_whitespace() {
-                    self.input.next();
-                } else {
-                    break;
-                }
+        while let Some(x) = self.input.get() {
+            if x.is_whitespace() {
+                self.input.next();
             } else {
                 break;
             }
@@ -64,13 +60,29 @@ impl<'a> Lexer<'a> {
     fn read_number(&mut self) -> Option<String> {
         let mut buffer = String::new();
         while let Some(x) = self.input.get() {
-            if x.is_ascii_digit() {
+            if x.is_numeric() {
                 buffer.push(*x);
                 self.input.next();
             } else {
                 break;
             }
         }
+        Some(buffer)
+    }
+
+    fn read_string(&mut self) -> Option<String> {
+        let mut buffer = String::new();
+        self.input.next();
+
+        while let Some(x) = self.input.get() {
+            if *x != '"' {
+                buffer.push(*x);
+                self.input.next();
+            } else {
+                break;
+            }
+        }
+
         Some(buffer)
     }
 }
@@ -91,14 +103,11 @@ impl<'a> Iterator for Lexer<'a> {
                 // Return out the function, as `read_number` already moves the cursor to where it needs to be
                 return Some(Token::Identifier(ident));
             }
-            '"' => {
-                todo!()
-            }
             ')' => Some(Token::RightParen),
             '(' => Some(Token::LeftParen),
             '}' => Some(Token::RightBrace),
             '{' => Some(Token::LeftBrace),
-            '=' => Some(Token::Equals),
+            '=' => Some(Token::Assign),
             '!' => {
                 if *self.input.peak()? == '=' {
                     self.input.next();
@@ -106,6 +115,10 @@ impl<'a> Iterator for Lexer<'a> {
                 } else {
                     Some(Token::InValid)
                 }
+            }
+            '"' => {
+                let string = self.read_string()?;
+                Some(Token::StringLiteral(string))
             }
             ',' => Some(Token::Comma),
             '\0' => None,
@@ -130,7 +143,7 @@ mod tests {
             Token::LeftParen,
             Token::RightParen,
             Token::RightBrace,
-            Token::Equals,
+            Token::Assign,
             Token::NotEquals,
         ];
 
@@ -140,17 +153,33 @@ mod tests {
     }
 
     #[test]
+    fn test_string() {
+        let input = "\"Hello World\"".chars().collect::<Vec<char>>();
+        let lexer = Lexer::new(&input);
+        let expected = &[Token::StringLiteral("Hello World".to_string())];
+
+        let lexed_tokens: Vec<Token> = lexer.collect();
+        assert_eq!(lexed_tokens.len(), expected.len());
+        assert_eq!(lexed_tokens, expected);
+    }
+
+    #[test]
     fn test_ident() {
-        let input = "heloo () worlkd".chars().collect::<Vec<char>>();
+        let input = "Hey world!= == ()".chars().collect::<Vec<char>>();
         let lexer = Lexer::new(&input);
         let expected = &[
-            Token::Identifier("heloo".to_string()),
+            Token::Identifier("Hey".to_string()),
+            Token::Identifier("world".to_string()),
+            Token::NotEquals,
+            Token::Assign,
+            Token::Assign,
             Token::LeftParen,
             Token::RightParen,
-            Token::Identifier("worlkd".to_string()),
         ];
 
         let lexed_tokens: Vec<Token> = lexer.collect();
-        assert_eq!(lexed_tokens, expected);
+        assert_eq!(lexed_tokens.len(), expected.len());
+        assert_eq!(dbg!(lexed_tokens), expected);
     }
 }
+
