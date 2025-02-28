@@ -4,33 +4,54 @@
 *
 * define_library(<LIB_NAME>, path=)
 *
+* let sj = <Variable>
+*
 */
 
-use super::peaker::Peaker;
+use super::peaker::{Cursor, MoveBackIterator};
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum Token {
     Identifier(String),
     Number(i64),
+    StringLiteral(String),
+
+    // Keywords
+    Let,
+    Return,
+    Process,
+    Function,
+
     RightParen,
     LeftParen,
     RightBrace,
     LeftBrace,
     Comma,
-    StringLiteral(String),
+    SemiColon,
     Assign,
     NotEquals,
+    Minus,
+    Add,
+    Divide,
+    Multiply,
+
+    LessThen,
+    GreaterThen,
+
+    LessOrEqualThen,
+    GreaterEqualThen,
+
     InValid,
 }
 
 pub struct Lexer<'a> {
-    input: Peaker<'a, char>,
+    input: Cursor<'a, char>,
 }
 
 impl<'a> Lexer<'a> {
     pub fn new(input: &'a [char]) -> Self {
         Self {
-            input: Peaker::new(input),
+            input: Cursor::new(input),
         }
     }
 
@@ -54,6 +75,8 @@ impl<'a> Lexer<'a> {
                 break;
             }
         }
+        // On success move the cursor back
+        self.input.next_prev().expect("Should Never fail");
         Some(buffer)
     }
 
@@ -67,6 +90,8 @@ impl<'a> Lexer<'a> {
                 break;
             }
         }
+        // On success move the cursor back
+        self.input.next_prev().expect("Should Never fail");
         Some(buffer)
     }
 
@@ -95,23 +120,60 @@ impl<'a> Iterator for Lexer<'a> {
         let res = match self.input.get()? {
             'a'..='z' | 'A'..='Z' => {
                 let ident = self.read_identifier()?;
+                match ident.as_str() {
+                    "return" => Some(Token::Return),
+                    "let" => Some(Token::Let),
+                    "proc" => Some(Token::Process),
+                    "fn" => Some(Token::Function),
+                    _ => Some(Token::Identifier(ident)),
+                }
                 // Return out the function, as `read_identifier` already moves the cursor to where it needs to be
-                return Some(Token::Identifier(ident));
             }
             '0'..='9' => {
-                let ident = self.read_number()?;
+                let ident = self.read_number()?.parse().unwrap();
                 // Return out the function, as `read_number` already moves the cursor to where it needs to be
-                return Some(Token::Identifier(ident));
+                Some(Token::Number(ident))
             }
+            ';' => Some(Token::SemiColon),
+            '-' => Some(Token::Minus),
+            '+' => Some(Token::Add),
+            '/' => Some(Token::Divide),
+            '*' => Some(Token::Multiply),
             ')' => Some(Token::RightParen),
             '(' => Some(Token::LeftParen),
             '}' => Some(Token::RightBrace),
             '{' => Some(Token::LeftBrace),
             '=' => Some(Token::Assign),
+            '<' => {
+                if let Some(peak) = self.input.peak() {
+                    if *peak == '=' {
+                        Some(Token::GreaterEqualThen)
+                    } else {
+                        Some(Token::InValid)
+                    }
+                } else {
+                    Some(Token::GreaterThen)
+                }
+            }
+            '>' => {
+                if let Some(peak) = self.input.peak() {
+                    if *peak == '=' {
+                        Some(Token::LessOrEqualThen)
+                    } else {
+                        Some(Token::InValid)
+                    }
+                } else {
+                    Some(Token::LessThen)
+                }
+            }
             '!' => {
-                if *self.input.peak()? == '=' {
-                    self.input.next();
-                    Some(Token::NotEquals)
+                if let Some(peak) = self.input.peak() {
+                    if *peak == '=' {
+                        self.input.next();
+                        Some(Token::NotEquals)
+                    } else {
+                        Some(Token::InValid)
+                    }
                 } else {
                     Some(Token::InValid)
                 }
@@ -130,6 +192,7 @@ impl<'a> Iterator for Lexer<'a> {
 }
 
 mod tests {
+    use super::Token::*;
     use super::*;
 
     #[test]
@@ -179,7 +242,39 @@ mod tests {
 
         let lexed_tokens: Vec<Token> = lexer.collect();
         assert_eq!(lexed_tokens.len(), expected.len());
-        assert_eq!(dbg!(lexed_tokens), expected);
+        assert_eq!(lexed_tokens, expected);
+    }
+
+    #[test]
+    fn test_function() {
+        let input = r##"
+            fn foo() {
+                let bar = "Hello World!";
+                return -1337;
+            }
+        "##;
+
+        let expected = vec![
+            Function,
+            Identifier("foo".to_string()),
+            LeftParen,
+            RightParen,
+            LeftBrace,
+            Let,
+            Identifier("bar".to_string()),
+            Assign,
+            StringLiteral("Hello World!".to_string()),
+            SemiColon,
+            Return,
+            Minus,
+            Number(1337),
+            SemiColon,
+            RightBrace,
+        ];
+        let chars = &input.chars().collect::<Vec<char>>();
+        let lexer = Lexer::new(chars);
+        let lexer_token = lexer.collect::<Vec<Token>>();
+        assert_eq!(lexer_token.len(), expected.len());
+        assert_eq!(lexer_token, expected);
     }
 }
-

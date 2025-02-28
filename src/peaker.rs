@@ -1,9 +1,11 @@
-pub(crate) struct Peaker<'a, T> {
+use std::iter::Filter;
+
+pub(crate) struct Cursor<'a, T> {
     items: &'a [T],
     idx: usize,
 }
 
-impl<'a, T> Peaker<'a, T> {
+impl<'a, T> Cursor<'a, T> {
     pub(crate) fn new(items: &'a [T]) -> Self {
         Self { items, idx: 0 }
     }
@@ -39,7 +41,22 @@ impl<'a, T> Peaker<'a, T> {
     }
 }
 
-impl<'a, T> Iterator for Peaker<'a, T> {
+pub trait MoveBackIterator {
+    type Item;
+    fn next_prev(&mut self) -> Option<Self::Item>;
+}
+
+impl<'a, T> MoveBackIterator for Cursor<'a, T> {
+    type Item = &'a T;
+
+    fn next_prev(&mut self) -> Option<Self::Item> {
+        let res = self.items.get(self.idx - 1)?;
+        self.idx -= 1;
+        Some(res)
+    }
+}
+
+impl<'a, T> Iterator for Cursor<'a, T> {
     type Item = &'a T;
     fn next(&mut self) -> Option<Self::Item> {
         let res = self.items.get(self.idx)?;
