@@ -1,0 +1,23 @@
+project("My Application", 3.14, MIT-License)
+
+compiler_flags(cmd=&[])
+
+sources(src/) // takes a list of strings
+
+download_dep(
+    url = "url://", 
+    des = destination/folder, 
+    cmd = ["build", "cmd"], 
+    artifact_path = path/to/final/artifact)
+OR
+download_dep(
+    url = "url://", 
+    des = destination/folder,
+    [default value is true] include_files = true) // if the dep has a build.ity file infer it from there
+
+search_dep(
+    name = "name of dep",
+    [optional] path = "path/to/lib",
+    )
+
+
