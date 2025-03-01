@@ -23,8 +23,8 @@ pub enum Token {
     Function,
     True,
     False,
-    For,
-    While,
+    ForLoop,
+    WhileLoop,
     Break,
     Continue,
     If,
@@ -44,11 +44,10 @@ pub enum Token {
     Divide,
     Multiply,
 
-    LessThen,
-    GreaterThen,
-
-    LessOrEqualThen,
-    GreaterEqualThen,
+    LessOrEqualThan,
+    LessThan,
+    GreaterOrEqualThan,
+    GreaterThan,
 
     InValid,
 }
@@ -85,7 +84,7 @@ impl<'a> Lexer<'a> {
             }
         }
         // On success move the cursor back
-        self.input.next_prev().expect("Should Never fail");
+        self.input.prev().expect("Should Never fail");
         Some(buffer)
     }
 
@@ -100,7 +99,7 @@ impl<'a> Lexer<'a> {
             }
         }
         // On success move the cursor back
-        self.input.next_prev().expect("Should Never fail");
+        self.input.prev().expect("Should Never fail");
         Some(buffer)
     }
 
@@ -131,6 +130,8 @@ impl<'a> Iterator for Lexer<'a> {
                 let ident = self.read_identifier()?;
                 match ident.as_str() {
                     "return" => Some(Token::Return),
+                    "for" => Some(Token::ForLoop),
+                    "while" => Some(Token::WhileLoop),
                     "let" => Some(Token::Let),
                     "proc" => Some(Token::Process),
                     "fn" => Some(Token::Function),
@@ -163,23 +164,23 @@ impl<'a> Iterator for Lexer<'a> {
             '<' => {
                 if let Some(peak) = self.input.peak() {
                     if *peak == '=' {
-                        Some(Token::GreaterEqualThen)
+                        Some(Token::LessOrEqualThan)
                     } else {
-                        Some(Token::InValid)
+                        Some(Token::LessThan)
                     }
                 } else {
-                    Some(Token::GreaterThen)
+                    Some(Token::LessThan)
                 }
             }
             '>' => {
                 if let Some(peak) = self.input.peak() {
                     if *peak == '=' {
-                        Some(Token::LessOrEqualThen)
+                        Some(Token::GreaterOrEqualThan)
                     } else {
-                        Some(Token::InValid)
+                        Some(Token::GreaterThan)
                     }
                 } else {
-                    Some(Token::LessThen)
+                    Some(Token::GreaterThan)
                 }
             }
             '!' => {
@@ -292,5 +293,56 @@ mod tests {
         let lexer_token = lexer.collect::<Vec<Token>>();
         assert_eq!(lexer_token.len(), expected.len());
         assert_eq!(lexer_token, expected);
+    }
+
+    #[test]
+    fn test_let_statement() {
+        let input: Vec<char> = "let x = 42;".chars().collect();
+        let mut lexer = Lexer::new(&input);
+        assert_eq!(lexer.next(), Some(Token::Let));
+        assert_eq!(lexer.next(), Some(Token::Identifier("x".to_string())));
+        assert_eq!(lexer.next(), Some(Token::Assign));
+        assert_eq!(lexer.next(), Some(Token::Number(42)));
+        assert_eq!(lexer.next(), Some(Token::SemiColon));
+        assert_eq!(lexer.next(), None);
+    }
+
+    #[test]
+    fn test_if_branch() {
+        let input: Vec<char> = "if (x < 10) { return x + 1; }".chars().collect();
+        let mut lexer = Lexer::new(&input);
+        assert_eq!(lexer.next(), Some(Token::If));
+        assert_eq!(lexer.next(), Some(Token::LeftParen));
+        assert_eq!(lexer.next(), Some(Token::Identifier("x".to_string())));
+        assert_eq!(lexer.next(), Some(Token::LessThan));
+        assert_eq!(lexer.next(), Some(Token::Number(10)));
+        assert_eq!(lexer.next(), Some(Token::RightParen));
+        assert_eq!(lexer.next(), Some(Token::LeftBrace));
+        assert_eq!(lexer.next(), Some(Token::Return));
+        assert_eq!(lexer.next(), Some(Token::Identifier("x".to_string())));
+        assert_eq!(lexer.next(), Some(Token::Add));
+        assert_eq!(lexer.next(), Some(Token::Number(1)));
+        assert_eq!(lexer.next(), Some(Token::SemiColon));
+        assert_eq!(lexer.next(), Some(Token::RightBrace));
+        assert_eq!(lexer.next(), None);
+    }
+
+    #[test]
+    fn test_invalid_token() {
+        let input: Vec<char> = "@".chars().collect();
+        let mut lexer = Lexer::new(&input);
+        assert_eq!(lexer.next(), Some(Token::InValid));
+    }
+
+    #[test]
+    fn test_whitespace_handling() {
+        let input: Vec<char> = "  let   x   =  5   ;   ".chars().collect();
+        let mut lexer = Lexer::new(&input);
+        assert_eq!(lexer.next(), Some(Token::Let));
+        assert_eq!(lexer.next(), Some(Token::Identifier("x".to_string())));
+        assert_eq!(lexer.next(), Some(Token::Assign));
+        assert_eq!(lexer.next(), Some(Token::Number(5)));
+        assert_eq!(lexer.next(), Some(Token::SemiColon));
+        assert_eq!(lexer.next(), None);
     }
 }

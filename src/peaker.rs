@@ -1,5 +1,6 @@
 use std::iter::Filter;
 
+#[derive(Debug)]
 pub(crate) struct Cursor<'a, T> {
     items: &'a [T],
     idx: usize,
@@ -22,14 +23,13 @@ impl<'a, T> Cursor<'a, T> {
         self.items.get(self.idx)
     }
 
-    pub(crate) fn slice_x_y(&self, x: usize, y: usize) -> Option<&[T]> {
-        if x >= self.items.len() {
-            return None;
+    pub(crate) fn slice_x_y(&self, range: std::ops::Range<usize>) -> Option<&[T]> {
+        // no need to check for X >= 0, type system already insures that
+        if range.end < self.items.len() {
+            Some(&self.items[range])
+        } else {
+            None
         }
-        if y >= self.items.len() {
-            return None;
-        }
-        Some(&self.items[x..=y])
     }
 
     pub(crate) fn slice_n(&self, n: usize) -> Option<&[T]> {
@@ -43,24 +43,123 @@ impl<'a, T> Cursor<'a, T> {
 
 pub trait MoveBackIterator {
     type Item;
-    fn next_prev(&mut self) -> Option<Self::Item>;
+    fn prev(&mut self) -> Option<Self::Item>;
 }
 
 impl<'a, T> MoveBackIterator for Cursor<'a, T> {
     type Item = &'a T;
 
-    fn next_prev(&mut self) -> Option<Self::Item> {
-        let res = self.items.get(self.idx - 1)?;
-        self.idx -= 1;
-        Some(res)
+    fn prev(&mut self) -> Option<Self::Item> {
+        if self.idx == 0 {
+            None
+        } else {
+            self.idx = self.idx.saturating_sub(1);
+            let res = self.items.get(self.idx)?;
+            Some(res)
+        }
     }
 }
 
 impl<'a, T> Iterator for Cursor<'a, T> {
     type Item = &'a T;
+    // Next will give the current value and advance the pointer
     fn next(&mut self) -> Option<Self::Item> {
         let res = self.items.get(self.idx)?;
-        self.idx += 1;
+        self.idx = self.idx.saturating_add(1);
         Some(res)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_new() {
+        let items = [1, 2, 3];
+        let cursor = Cursor::new(&items);
+        assert_eq!(cursor.idx(), 0);
+    }
+
+    #[test]
+    fn test_get() {
+        let items = [1, 2, 3];
+        let cursor = Cursor::new(&items);
+        assert_eq!(cursor.get(), Some(&1));
+    }
+
+    #[test]
+    fn test_peak() {
+        let items = [1, 2, 3];
+        let cursor = Cursor::new(&items);
+        assert_eq!(cursor.peak(), Some(&2));
+    }
+
+    #[test]
+    fn test_slice_x_y() {
+        let items = [1, 2, 3, 4, 5];
+        let cursor = Cursor::new(&items);
+        assert_eq!(cursor.slice_x_y(1..4), Some(&[2, 3, 4][..]));
+        assert_eq!(cursor.slice_x_y(4..6), None);
+    }
+
+    #[test]
+    fn test_slice_n() {
+        let items = [1, 2, 3, 4, 5];
+        let cursor = Cursor::new(&items);
+        assert_eq!(cursor.slice_n(2), Some(&[1, 2, 3][..]));
+        assert_eq!(cursor.slice_n(5), None);
+    }
+
+    #[test]
+    fn test_iterator() {
+        let items = [1, 2, 3];
+        let mut cursor = Cursor::new(&items);
+        assert_eq!(cursor.next(), Some(&1));
+        assert_eq!(cursor.next(), Some(&2));
+        assert_eq!(cursor.next(), Some(&3));
+        assert_eq!(cursor.next(), None);
+    }
+
+    #[test]
+    fn test_empty_cursor() {
+        let items: [i32; 0] = [];
+        let mut cursor = Cursor::new(&items);
+        assert_eq!(cursor.get(), None);
+        assert_eq!(cursor.next(), None);
+        assert_eq!(cursor.prev(), None);
+        assert_eq!(cursor.slice_x_y(0..1), None);
+        assert_eq!(cursor.slice_n(1), None);
+    }
+
+    #[test]
+    fn test_cursor_with_large_list() {
+        let items: Vec<i32> = (0..100).collect();
+        let mut cursor = Cursor::new(&items);
+        assert_eq!(cursor.get(), Some(&0));
+        for i in 0..100 {
+            assert_eq!(cursor.next(), Some(&items[i]));
+        }
+        assert_eq!(cursor.next(), None);
+        assert_eq!(cursor.prev(), Some(&99));
+        assert_eq!(cursor.prev(), Some(&98));
+        assert_eq!(cursor.prev(), Some(&97));
+    }
+
+    #[test]
+    fn test_cursor_boundaries() {
+        let items = [10, 20, 30, 40];
+        let mut cursor = Cursor::new(&items);
+        assert_eq!(cursor.next(), Some(&10));
+        assert_eq!(cursor.next(), Some(&20));
+        assert_eq!(cursor.next(), Some(&30));
+        assert_eq!(cursor.next(), Some(&40));
+        assert_eq!(cursor.next(), None);
+        assert_eq!(cursor.prev(), Some(&40));
+        assert_eq!(cursor.prev(), Some(&30));
+        assert_eq!(cursor.prev(), Some(&20));
+        assert_eq!(cursor.prev(), Some(&10));
+        dbg!(&cursor);
+        assert_eq!(cursor.prev(), None);
     }
 }

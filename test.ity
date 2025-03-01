@@ -1,6 +1,8 @@
-project("My Application", 3.14, MIT-License)
+project(name = "My Application", version = 3.14)
 
 compiler_flags(cmd=&[])
+build_folder("Build") // Default to `target`
+
 
 sources(src/) // takes a list of strings
 
@@ -15,9 +17,15 @@ download_dep(
     des = destination/folder,
     [default value is true] include_files = true) // if the dep has a build.ity file infer it from there
 
+downlaod_resource(
+    url = "url://",
+    des = destination/folder
+)
+
+
+
+// uses `pkg-config` underthehood
 search_dep(
     name = "name of dep",
     [optional] path = "path/to/lib",
     )
-
-
