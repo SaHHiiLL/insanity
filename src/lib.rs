@@ -1,7 +1,7 @@
+#![allow(dead_code)]
 mod lexer;
 mod parser;
 mod peaker;
 
-use lexer::Lexer;
-use parser::Parser;
-use peaker::Cursor;
+pub use self::lexer::Lexer;
+pub use self::parser::Parser;
