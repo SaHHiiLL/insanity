@@ -1,6 +1,4 @@
-use std::iter::Filter;
-
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub(crate) struct Cursor<'a, T> {
     items: &'a [T],
     idx: usize,

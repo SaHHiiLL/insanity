@@ -144,11 +144,9 @@ impl<'a> Iterator for Lexer<'a> {
                     "elif" => Some(Token::ElseIf),
                     _ => Some(Token::Identifier(ident)),
                 }
-                // Return out the function, as `read_identifier` already moves the cursor to where it needs to be
             }
             '0'..='9' => {
                 let ident = self.read_number()?.parse().unwrap();
-                // Return out the function, as `read_number` already moves the cursor to where it needs to be
                 Some(Token::Number(ident))
             }
             ';' => Some(Token::SemiColon),
