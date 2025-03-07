@@ -21,6 +21,7 @@ impl<'a> Parser<'a> {
             match token {
                 Token::Let => todo!(),
                 Token::Return => todo!(),
+                Token::SemiColon => todo!("End of expression!"),
                 Token::Identifier(_ident) => todo!(),
                 _ => todo!(),
             }
@@ -37,5 +38,14 @@ impl<'a> Parser<'a> {
             "Expedted `=` got something else {:?}",
             assign
         );
+        let mut expression_tokens = vec![];
+        while let Some(token) = self.lexer.next() {
+            if token == Token::SemiColon {
+                break;
+            }
+            expression_tokens.push(token);
+        }
+        let expression = Expression::from(expression_tokens);
+        Ok(LetStatement::new(Identifier::from(ident), expression))
     }
 }

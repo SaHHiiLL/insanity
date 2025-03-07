@@ -1,3 +1,5 @@
+use std::collections::btree_map::Range;
+
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct Cursor<'a, T> {
     items: &'a [T],

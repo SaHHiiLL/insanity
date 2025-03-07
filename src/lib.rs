@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 mod ast;
+mod error;
 mod lexer;
 mod parser;
 mod peaker;

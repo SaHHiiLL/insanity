@@ -8,3 +8,4 @@ license-file = "LICENSE"
 
 [dependencies]
 iter_tools = "0.24.0"
+thiserror = "2.0.12"
