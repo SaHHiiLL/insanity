@@ -144,12 +144,10 @@ impl Iterator for Lexer<'_> {
                         "elif" => Some(Token::ElseIf),
                         _ => Some(Token::Identifier(ident)),
                     },
-                    Err(_) => Some(Token::InValid(InsanityLexerError::new(
+                    Err(_) => Some(Token::InValid(InsanityLexerError::new_s(
                         start_position,
                         self.input.idx(),
-                        self.input
-                            .slice_x_y(start_position..self.input.idx())
-                            .expect("Should always have a valid index"),
+                        &self.input,
                     ))),
                 }
             }
@@ -157,12 +155,10 @@ impl Iterator for Lexer<'_> {
                 self.read_number()
                     // should never panic because read_number only reads numbers
                     .map_or(
-                        Token::InValid(InsanityLexerError::new(
+                        Token::InValid(InsanityLexerError::new_s(
                             start_position,
                             self.input.idx(),
-                            self.input
-                                .slice_x_y(start_position..self.input.idx())
-                                .expect("Should always have a valid index"),
+                            &self.input,
                         )),
                         |z| Token::Number(z.parse().unwrap()),
                     ),
@@ -205,44 +201,34 @@ impl Iterator for Lexer<'_> {
                         self.input.next();
                         Some(Token::NotEquals)
                     } else {
-                        Some(Token::InValid(InsanityLexerError::new(
+                        Some(Token::InValid(InsanityLexerError::new_s(
                             start_position,
                             self.input.idx(),
-                            self.input
-                                .slice_x_y(start_position..self.input.idx())
-                                .expect("Should always have a valid index"),
+                            &self.input,
                         )))
                     }
                 } else {
-                    Some(Token::InValid(InsanityLexerError::new(
+                    Some(Token::InValid(InsanityLexerError::new_s(
                         start_position,
                         self.input.idx(),
-                        self.input
-                            .slice_x_y(start_position..self.input.idx())
-                            .expect("Should always have a valid index"),
+                        &self.input,
                     )))
                 }
             }
-            '"' => Some(
-                self.read_string().map_or(
-                    Token::InValid(InsanityLexerError::new(
-                        start_position,
-                        self.input.idx(),
-                        self.input
-                            .slice_x_y(start_position..self.input.idx())
-                            .unwrap(),
-                    )),
-                    |z| Token::StringLiteral(z),
-                ),
-            ),
+            '"' => Some(self.read_string().map_or(
+                Token::InValid(InsanityLexerError::new_s(
+                    start_position,
+                    self.input.idx(),
+                    &self.input,
+                )),
+                |z| Token::StringLiteral(z),
+            )),
             ',' => Some(Token::Comma),
             '\0' => None,
-            _ => Some(Token::InValid(InsanityLexerError::new(
+            _ => Some(Token::InValid(InsanityLexerError::new_s(
                 start_position,
                 self.input.idx(),
-                self.input
-                    .slice_x_y(start_position..self.input.idx())
-                    .unwrap(),
+                &self.input,
             ))),
         };
         self.input.next();

@@ -1,3 +1,5 @@
+use std::io::Cursor;
+
 use thiserror::Error;
 
 #[derive(Error, Debug, Clone, Eq, PartialEq)]
@@ -16,6 +18,26 @@ impl InsanityLexerError {
             end_position,
             string_rep,
         }
+    }
+
+    pub fn new_s<'a>(
+        start_position: usize,
+        end_position: usize,
+        cursor: &crate::peaker::Cursor<'a, char>,
+    ) -> Self {
+        InsanityLexerError::new(
+            start_position,
+            end_position,
+            cursor
+                .slice_x_y(start_position..end_position)
+                .expect(format!(
+                    "Should always have this rage start_position: `{}`, end_position: `{}`, cursor_idx: `{}`, cursor_len: `{}`",
+                    start_position,
+                    end_position,
+                    cursor.idx(),
+                    cursor.len()
+                ).as_str()),
+        )
     }
 
     pub fn new_string(start_position: usize, end_position: usize, string_rep: String) -> Self {

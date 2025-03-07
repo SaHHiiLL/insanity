@@ -11,6 +11,10 @@ impl<'a, T> Cursor<'a, T> {
         Self { items, idx: 0 }
     }
 
+    pub(crate) fn len(&self) -> usize {
+        self.items.len()
+    }
+
     pub(crate) fn peak(&self) -> Option<&T> {
         self.items.get(self.idx + 1)
     }
