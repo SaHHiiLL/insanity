@@ -1,6 +1,6 @@
 project(name = "My Application", version = 3.14)
 
-compiler_flags(cmd=&[])
+compiler_flags(cmd=[])
 build_folder("Build") // Default to `target`
 
 
@@ -9,7 +9,7 @@ sources(src/) // takes a list of strings
 download_dep(
     url = "url://", 
     des = destination/folder, 
-    cmd = ["build", "cmd"], 
+    build_cmd = ["make"], 
     artifact_path = path/to/final/artifact)
 OR
 download_dep(
@@ -22,7 +22,21 @@ downlaod_resource(
     des = destination/folder
 )
 
+proc do_mkdir(path: str) {
+    os.mkdir(path);
+}
 
+fn add(x: int, y: int) : int {
+    return x + y;
+}
+
+let x = add(5, 4)
+
+if check_folder_exist("./build/") {
+    .. do something ..
+} else {
+    .. do something else ..
+}
 
 // uses `pkg-config` underthehood
 search_dep(

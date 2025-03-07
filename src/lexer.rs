@@ -49,9 +49,11 @@ pub enum Token {
     GreaterOrEqualThan,
     GreaterThan,
 
+    // InValid(ErrorStruct)
     InValid,
 }
 
+#[derive(Debug, Clone)]
 pub struct Lexer<'a> {
     input: Cursor<'a, char>,
 }
@@ -73,22 +75,22 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    fn read_identifier(&mut self) -> Option<String> {
+    fn read_identifier(&mut self) -> Result<String, ()> {
         let mut buffer = String::new();
         while let Some(x) = self.input.get() {
-            if x.is_alphanumeric() {
+            if x.is_alphanumeric() || *x == '_' || *x == '-' {
                 buffer.push(*x);
                 self.input.next();
             } else {
                 break;
             }
         }
-        // On success move the cursor back
+        // On success moves the cursor back
         self.input.prev().expect("Should Never fail");
-        Some(buffer)
+        Ok(buffer)
     }
 
-    fn read_number(&mut self) -> Option<String> {
+    fn read_number(&mut self) -> Result<String, ()> {
         let mut buffer = String::new();
         while let Some(x) = self.input.get() {
             if x.is_numeric() {
@@ -98,12 +100,12 @@ impl<'a> Lexer<'a> {
                 break;
             }
         }
-        // On success move the cursor back
+        // On success moves the cursor back
         self.input.prev().expect("Should Never fail");
-        Some(buffer)
+        Ok(buffer)
     }
 
-    fn read_string(&mut self) -> Option<String> {
+    fn read_string(&mut self) -> Result<String, ()> {
         let mut buffer = String::new();
         self.input.next();
 
@@ -116,39 +118,47 @@ impl<'a> Lexer<'a> {
             }
         }
 
-        Some(buffer)
+        Ok(buffer)
+    }
+
+    pub fn peak(&self) -> Option<Token> {
+        self.clone().next()
     }
 }
 
-impl<'a> Iterator for Lexer<'a> {
+impl Iterator for Lexer<'_> {
     type Item = Token;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.skip_spaces();
         let res = match self.input.get()? {
             'a'..='z' | 'A'..='Z' => {
-                let ident = self.read_identifier()?;
-                match ident.as_str() {
-                    "return" => Some(Token::Return),
-                    "for" => Some(Token::ForLoop),
-                    "while" => Some(Token::WhileLoop),
-                    "let" => Some(Token::Let),
-                    "proc" => Some(Token::Process),
-                    "fn" => Some(Token::Function),
-                    "true" => Some(Token::True),
-                    "false" => Some(Token::False),
-                    "break" => Some(Token::Break),
-                    "continue" => Some(Token::Continue),
-                    "if" => Some(Token::If),
-                    "else" => Some(Token::Else),
-                    "elif" => Some(Token::ElseIf),
-                    _ => Some(Token::Identifier(ident)),
+                let ident = self.read_identifier();
+                match ident {
+                    Ok(ident) => match ident.as_str() {
+                        "return" => Some(Token::Return),
+                        "for" => Some(Token::ForLoop),
+                        "while" => Some(Token::WhileLoop),
+                        "let" => Some(Token::Let),
+                        "proc" => Some(Token::Process),
+                        "fn" => Some(Token::Function),
+                        "true" => Some(Token::True),
+                        "false" => Some(Token::False),
+                        "break" => Some(Token::Break),
+                        "continue" => Some(Token::Continue),
+                        "if" => Some(Token::If),
+                        "else" => Some(Token::Else),
+                        "elif" => Some(Token::ElseIf),
+                        _ => Some(Token::Identifier(ident)),
+                    },
+                    Err(_) => Some(Token::InValid),
                 }
             }
-            '0'..='9' => {
-                let ident = self.read_number()?.parse().unwrap();
-                Some(Token::Number(ident))
-            }
+            '0'..='9' => Some(
+                self.read_number()
+                    // should never panic because read_number only reads numbers
+                    .map_or(Token::InValid, |z| Token::Number(z.parse().unwrap())),
+            ),
             ';' => Some(Token::SemiColon),
             '-' => Some(Token::Minus),
             '+' => Some(Token::Add),
@@ -193,10 +203,10 @@ impl<'a> Iterator for Lexer<'a> {
                     Some(Token::InValid)
                 }
             }
-            '"' => {
-                let string = self.read_string()?;
-                Some(Token::StringLiteral(string))
-            }
+            '"' => Some(
+                self.read_string()
+                    .map_or(Token::InValid, |z| Token::StringLiteral(z)),
+            ),
             ',' => Some(Token::Comma),
             '\0' => None,
             _ => Some(Token::InValid),
@@ -207,8 +217,18 @@ impl<'a> Iterator for Lexer<'a> {
 }
 
 mod tests {
-    use super::Token::*;
-    use super::*;
+    #![allow(unused_imports)]
+    use crate::{lexer::Token, Lexer};
+
+    #[test]
+    fn test_peak() {
+        let input: Vec<char> = "let x = 10;".chars().collect();
+        let mut lexer = Lexer::new(&input);
+        assert_eq!(lexer.peak(), Some(Token::Let));
+        assert_eq!(lexer.peak(), Some(Token::Let));
+        assert_eq!(lexer.next(), Some(Token::Let));
+        assert_eq!(lexer.peak(), Some(Token::Identifier("x".to_string())));
+    }
 
     #[test]
     fn test_lexer() {
@@ -270,21 +290,21 @@ mod tests {
         "##;
 
         let expected = vec![
-            Function,
-            Identifier("foo".to_string()),
-            LeftParen,
-            RightParen,
-            LeftBrace,
-            Let,
-            Identifier("bar".to_string()),
-            Assign,
-            StringLiteral("Hello World!".to_string()),
-            SemiColon,
-            Return,
-            Minus,
-            Number(1337),
-            SemiColon,
-            RightBrace,
+            Token::Function,
+            Token::Identifier("foo".to_string()),
+            Token::LeftParen,
+            Token::RightParen,
+            Token::LeftBrace,
+            Token::Let,
+            Token::Identifier("bar".to_string()),
+            Token::Assign,
+            Token::StringLiteral("Hello World!".to_string()),
+            Token::SemiColon,
+            Token::Return,
+            Token::Minus,
+            Token::Number(1337),
+            Token::SemiColon,
+            Token::RightBrace,
         ];
         let chars = &input.chars().collect::<Vec<char>>();
         let lexer = Lexer::new(chars);
