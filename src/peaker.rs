@@ -1,5 +1,3 @@
-use std::collections::btree_map::Range;
-
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct Cursor<'a, T> {
     items: &'a [T],
@@ -41,6 +39,21 @@ impl<'a, T> Cursor<'a, T> {
             None
         } else {
             Some(&self.items[self.idx..=n])
+        }
+    }
+}
+
+impl<'a> Cursor<'a, char> {
+    pub(crate) fn to_string(&self) -> String {
+        self.items.iter().collect::<String>()
+    }
+
+    pub(crate) fn slice_x_y_stirng(&self, range: std::ops::Range<usize>) -> Option<String> {
+        // no need to check for X >= 0, type system already insures that
+        if range.end < self.items.len() {
+            Some(self.items[range].iter().collect())
+        } else {
+            None
         }
     }
 }

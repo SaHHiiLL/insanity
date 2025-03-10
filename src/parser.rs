@@ -1,5 +1,6 @@
 use crate::ast::*;
-use crate::lexer::{Lexer, Token};
+use crate::error::ParserError;
+use crate::lexer::{Lexer, TokenType};
 
 pub struct Parser<'a> {
     lexer: Lexer<'a>,
@@ -18,34 +19,54 @@ impl<'a> Parser<'a> {
         let res = Program::new();
 
         while let Some(token) = self.lexer.next() {
-            match token {
-                Token::Let => todo!(),
-                Token::Return => todo!(),
-                Token::SemiColon => todo!("End of expression!"),
-                Token::Identifier(_ident) => todo!(),
+            let token = token.token_type();
+            let _ = match token {
+                TokenType::Let => self.parse_let(),
+                TokenType::Return => todo!(),
+                TokenType::SemiColon => continue,
+                TokenType::Identifier(_ident) => todo!(),
                 _ => todo!(),
-            }
+            };
         }
         Some(res)
     }
 
-    fn parse_let(&mut self) -> Result<LetStatement, ()> {
+    fn parse_let(&mut self) -> Result<LetStatement, ParserError> {
         let ident = self.lexer.next().expect("Expected Identifier got none");
         let assign = self.lexer.next().expect("Expected `=` got None");
         assert_eq!(
-            Token::Assign,
-            assign,
+            &TokenType::Assign,
+            assign.token_type(),
             "Expedted `=` got something else {:?}",
             assign
         );
         let mut expression_tokens = vec![];
         while let Some(token) = self.lexer.next() {
-            if token == Token::SemiColon {
+            if *token.token_type() == TokenType::SemiColon {
                 break;
             }
             expression_tokens.push(token);
         }
-        let expression = Expression::from(expression_tokens);
-        Ok(LetStatement::new(Identifier::from(ident), expression))
+        let expression = Expression::try_from(expression_tokens)?;
+        Ok(LetStatement::new(Identifier::try_from(ident)?, expression))
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::Lexer;
+
+    use super::Parser;
+
+    #[test]
+    fn test_let_statement() {
+        let input = r#"
+            let x = 5 * 5;
+        "#
+        .chars()
+        .collect::<Vec<char>>();
+        let lexer = Lexer::new(&input);
+        let mut parser = Parser::new(lexer);
+        parser.parse();
     }
 }

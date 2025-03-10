@@ -1,16 +1,16 @@
-use std::io::Cursor;
-
 use thiserror::Error;
 
+use crate::lexer::Token;
+
 #[derive(Error, Debug, Clone, Eq, PartialEq)]
-pub struct InsanityLexerError {
+pub struct LexerError {
     start_position: usize,
     end_position: usize,
     string_rep: String,
 }
 
-impl InsanityLexerError {
-    pub fn new(start_position: usize, end_position: usize, chars: &[char]) -> Self {
+impl LexerError {
+    pub(crate) fn new(start_position: usize, end_position: usize, chars: &[char]) -> Self {
         let mut string_rep = String::with_capacity(chars.len());
         chars.iter().for_each(|f| string_rep.push(*f));
         Self {
@@ -20,12 +20,12 @@ impl InsanityLexerError {
         }
     }
 
-    pub fn new_s<'a>(
+    pub(crate) fn new_s<'a>(
         start_position: usize,
         end_position: usize,
         cursor: &crate::peaker::Cursor<'a, char>,
     ) -> Self {
-        InsanityLexerError::new(
+        LexerError::new(
             start_position,
             end_position,
             cursor
@@ -40,7 +40,11 @@ impl InsanityLexerError {
         )
     }
 
-    pub fn new_string(start_position: usize, end_position: usize, string_rep: String) -> Self {
+    pub(crate) fn new_string(
+        start_position: usize,
+        end_position: usize,
+        string_rep: String,
+    ) -> Self {
         Self {
             start_position,
             end_position,
@@ -49,12 +53,39 @@ impl InsanityLexerError {
     }
 }
 
-impl std::fmt::Display for InsanityLexerError {
+impl std::fmt::Display for LexerError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "InsanityLexerError {{ start_position: {},\nend_position: {},\nstring_rep: {}}}",
+            "LexerError {{ start_position: {},\nend_position: {},\nstring_rep: {}}}",
             self.start_position, self.end_position, self.string_rep
+        )
+    }
+}
+
+#[derive(Error, Clone, Debug, Eq, PartialEq)]
+pub enum ParserError {
+    ExpectedExpression(String),
+    InvalidExpression(Token),
+    InvalidIdentifier(Token),
+}
+
+impl std::fmt::Display for ParserError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                ParserError::ExpectedExpression(got) => {
+                    format!("ExpectedExpression {{ Got({}) }}", got)
+                }
+                Self::InvalidExpression(token) => {
+                    format!("InvalidExpression {{ {} }}", token)
+                }
+                Self::InvalidIdentifier(token) => {
+                    format!("InvalidIdentifier {{ {} }}", token)
+                }
+            }
         )
     }
 }

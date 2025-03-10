@@ -1,6 +1,10 @@
 // https://github.com/ThePrimeagen/ts-rust-zig-deez/blob/3441b21d30a8d8488f2bec85cef4f9054891e9ea/rust_dr/src/ast/mod.rs
 
-use crate::lexer::Token;
+use crate::{
+    error::ParserError,
+    lexer::{Token, TokenType},
+    peaker::Cursor,
+};
 
 #[derive(Debug)]
 pub(crate) enum Statement {
@@ -17,12 +21,29 @@ pub(crate) struct ProcessStatement {
 #[derive(Debug)]
 pub(crate) enum Expression {
     Identifier(Identifier),
-    Literal(Literal),
+    StringLiteral(Literal),
 }
 
-impl From<Vec<Token>> for Expression {
-    fn from(_value: Vec<Token>) -> Self {
-        todo!()
+impl TryFrom<Vec<Token>> for Expression {
+    type Error = ParserError;
+
+    fn try_from(value: Vec<Token>) -> Result<Self, Self::Error> {
+        let mut cursor = Cursor::new(&value);
+        let x = cursor
+            .next()
+            .ok_or(ParserError::ExpectedExpression("None".to_string()))?;
+        let token_type = x.token_type();
+        match token_type {
+            TokenType::Number(_) => todo!(),
+            TokenType::Identifier(_) => todo!(),
+            TokenType::StringLiteral(literal_value) => Ok(Expression::StringLiteral(
+                Literal::from(literal_value.to_owned()),
+            )),
+            TokenType::True => todo!(),
+            TokenType::False => todo!(),
+            TokenType::Minus => todo!(),
+            _ => return Err(ParserError::InvalidExpression(x.clone())),
+        }
     }
 }
 
@@ -63,12 +84,14 @@ pub(crate) struct Identifier {
 }
 
 impl TryFrom<Token> for Identifier {
-    type Error = ();
+    type Error = ParserError;
 
     fn try_from(value: Token) -> Result<Self, Self::Error> {
-        match value {
-            Token::Identifier(ident) => Ok(Self { name: ident }),
-            _ => Err(()),
+        match value.token_type() {
+            TokenType::Identifier(ident) => Ok(Self {
+                name: ident.to_owned(),
+            }),
+            _ => Err(ParserError::InvalidIdentifier(value)),
         }
     }
 }
@@ -82,4 +105,10 @@ impl Identifier {
 #[derive(Debug)]
 pub(crate) struct Literal {
     value: String,
+}
+
+impl From<String> for Literal {
+    fn from(value: String) -> Self {
+        Self { value }
+    }
 }
