@@ -20,23 +20,21 @@ impl LexerError {
         }
     }
 
-    pub(crate) fn new_s<'a>(
+    pub(crate) fn new_s(
         start_position: usize,
         end_position: usize,
-        cursor: &crate::peaker::Cursor<'a, char>,
+        cursor: &crate::peaker::Cursor<'_, char>,
     ) -> Self {
         LexerError::new(
             start_position,
             end_position,
             cursor
                 .slice_x_y(start_position..end_position)
-                .expect(format!(
-                    "Should always have this rage start_position: `{}`, end_position: `{}`, cursor_idx: `{}`, cursor_len: `{}`",
+                .unwrap_or_else(|| panic!("Should always have this rage start_position: `{}`, end_position: `{}`, cursor_idx: `{}`, cursor_len: `{}`",
                     start_position,
                     end_position,
                     cursor.idx(),
-                    cursor.len()
-                ).as_str()),
+                    cursor.len())),
         )
     }
 

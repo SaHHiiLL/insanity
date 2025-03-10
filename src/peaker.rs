@@ -43,11 +43,13 @@ impl<'a, T> Cursor<'a, T> {
     }
 }
 
-impl<'a> Cursor<'a, char> {
-    pub(crate) fn to_string(&self) -> String {
-        self.items.iter().collect::<String>()
+impl std::fmt::Display for Cursor<'_, char> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.items.iter().collect::<String>())
     }
+}
 
+impl Cursor<'_, char> {
     pub(crate) fn slice_x_y_stirng(&self, range: std::ops::Range<usize>) -> Option<String> {
         // no need to check for X >= 0, type system already insures that
         if range.end < self.items.len() {

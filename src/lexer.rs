@@ -305,7 +305,7 @@ impl Iterator for Lexer<'_> {
                     self.input.idx(),
                     &self.input,
                 )),
-                |z| TokenType::StringLiteral(z),
+                TokenType::StringLiteral,
             )),
             ',' => Some(TokenType::Comma),
             '\0' => None,

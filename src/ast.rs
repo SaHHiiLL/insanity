@@ -42,7 +42,7 @@ impl TryFrom<Vec<Token>> for Expression {
             TokenType::True => todo!(),
             TokenType::False => todo!(),
             TokenType::Minus => todo!(),
-            _ => return Err(ParserError::InvalidExpression(x.clone())),
+            _ => Err(ParserError::InvalidExpression(x.clone())),
         }
     }
 }

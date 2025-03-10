@@ -41,7 +41,7 @@ impl<'a> Parser<'a> {
             assign
         );
         let mut expression_tokens = vec![];
-        while let Some(token) = self.lexer.next() {
+        for token in self.lexer.by_ref() {
             if *token.token_type() == TokenType::SemiColon {
                 break;
             }
