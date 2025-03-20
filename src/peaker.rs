@@ -34,12 +34,18 @@ impl<'a, T> Cursor<'a, T> {
         }
     }
 
+    /// Returns a slice of `T` from self.idx..=n
     pub(crate) fn slice_n(&self, n: usize) -> Option<&[T]> {
         if n >= self.items.len() {
             None
         } else {
             Some(&self.items[self.idx..=n])
         }
+    }
+
+    /// Returns a slice of `T` from n..self.idx
+    pub(crate) fn n_slice(&self, n: usize) -> Option<&[T]> {
+        Some(&self.items[n..self.idx])
     }
 }
 

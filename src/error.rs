@@ -10,42 +10,28 @@ pub struct LexerError {
 }
 
 impl LexerError {
-    pub(crate) fn new(start_position: usize, end_position: usize, chars: &[char]) -> Self {
+    pub(crate) fn new(start_position: usize, chars: &[char]) -> Self {
         let mut string_rep = String::with_capacity(chars.len());
         chars.iter().for_each(|f| string_rep.push(*f));
         Self {
             start_position,
-            end_position,
+            end_position: start_position + string_rep.len(),
             string_rep,
         }
     }
 
-    pub(crate) fn new_s(
-        start_position: usize,
-        end_position: usize,
-        cursor: &crate::peaker::Cursor<'_, char>,
-    ) -> Self {
-        LexerError::new(
-            start_position,
-            end_position,
-            cursor
-                .slice_x_y(start_position..end_position)
-                .unwrap_or_else(|| panic!("Should always have this rage start_position: `{}`, end_position: `{}`, cursor_idx: `{}`, cursor_len: `{}`",
-                    start_position,
-                    end_position,
-                    cursor.idx(),
-                    cursor.len())),
-        )
+    pub(crate) fn empty() -> Self {
+        Self {
+            start_position: 0,
+            end_position: 0,
+            string_rep: String::new(),
+        }
     }
 
-    pub(crate) fn new_string(
-        start_position: usize,
-        end_position: usize,
-        string_rep: String,
-    ) -> Self {
+    pub(crate) fn new_string(start_position: usize, string_rep: String) -> Self {
         Self {
             start_position,
-            end_position,
+            end_position: start_position + string_rep.len(),
             string_rep,
         }
     }
