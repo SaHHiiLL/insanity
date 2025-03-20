@@ -5,33 +5,44 @@ use crate::lexer::Token;
 #[derive(Error, Debug, Clone, Eq, PartialEq)]
 pub struct LexerError {
     start_position: usize,
-    end_position: usize,
+    line_number: usize,
     string_rep: String,
 }
 
+#[cfg(test)]
 impl LexerError {
-    pub(crate) fn new(start_position: usize, chars: &[char]) -> Self {
+    pub(crate) fn test<T: ToString>(start_position: usize, line_nbr: usize, chars: T) -> Self {
+        Self {
+            start_position,
+            line_number: line_nbr,
+            string_rep: chars.to_string(),
+        }
+    }
+}
+
+impl LexerError {
+    pub(crate) fn new(start_position: usize, line_nbr: usize, chars: &[char]) -> Self {
         let mut string_rep = String::with_capacity(chars.len());
         chars.iter().for_each(|f| string_rep.push(*f));
         Self {
             start_position,
-            end_position: start_position + string_rep.len(),
+            line_number: line_nbr,
             string_rep,
         }
     }
 
     pub(crate) fn empty() -> Self {
         Self {
-            start_position: 0,
-            end_position: 0,
+            start_position: 1,
+            line_number: 1,
             string_rep: String::new(),
         }
     }
 
-    pub(crate) fn new_string(start_position: usize, string_rep: String) -> Self {
+    pub(crate) fn new_string(start_position: usize, line_nbr: usize, string_rep: String) -> Self {
         Self {
             start_position,
-            end_position: start_position + string_rep.len(),
+            line_number: line_nbr,
             string_rep,
         }
     }
@@ -41,8 +52,8 @@ impl std::fmt::Display for LexerError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "LexerError {{ start_position: {},\nend_position: {},\nstring_rep: {}}}",
-            self.start_position, self.end_position, self.string_rep
+            "LexerError {{ start_position: {},\nstring_rep: {}}}",
+            self.start_position, self.string_rep
         )
     }
 }

@@ -45,7 +45,7 @@ impl<'a, T> Cursor<'a, T> {
 
     /// Returns a slice of `T` from n..self.idx
     pub(crate) fn n_slice(&self, n: usize) -> Option<&[T]> {
-        Some(&self.items[n..self.idx])
+        Some(&self.items[n..=self.idx])
     }
 }
 

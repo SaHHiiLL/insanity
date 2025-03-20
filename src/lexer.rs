@@ -141,12 +141,8 @@ impl<'a> Lexer<'a> {
                 if *x == '\n' {
                     self.curr_line += 1;
                     self.curr_char = 0;
-                } else if *x == ' ' {
-                    self.curr_char += 1;
-                } else {
-                    panic!("Invalid whitespace: {}", *x)
                 }
-                self.input.next();
+                self.read_next();
             } else {
                 break;
             }
@@ -158,12 +154,11 @@ impl<'a> Lexer<'a> {
         while let Some(x) = self.input.get() {
             if x.is_alphanumeric() || *x == '_' || *x == '-' {
                 buffer.push(*x);
-                self.input.next();
+                self.read_next();
             } else {
                 break;
             }
         }
-        self.curr_char = self.curr_char.wrapping_add(buffer.len());
         // On success moves the cursor back
         self.input.prev().expect("Should Never fail");
         Ok(buffer)
@@ -174,31 +169,42 @@ impl<'a> Lexer<'a> {
         while let Some(x) = self.input.get() {
             if x.is_numeric() {
                 buffer.push(*x);
-                self.input.next();
+                self.read_next();
             } else {
                 break;
             }
         }
 
-        self.curr_char = self.curr_char.wrapping_add(buffer.len());
         // On success moves the cursor back
         self.input.prev().expect("Should Never fail");
         Ok(buffer)
     }
 
+    /// Reads the next char and increments the line number and current char number incase of Some()
+    fn read_next(&mut self) -> Option<&'_ char> {
+        self.input.next().map(|c| {
+            if *c == '\n' {
+                self.curr_line += 1;
+                self.curr_char = 0;
+            } else {
+                self.curr_char += 1;
+            }
+            c
+        })
+    }
+
     fn read_string(&mut self) -> Result<String, ()> {
         let mut buffer = String::new();
-        self.input.next();
+        self.read_next();
 
         while let Some(x) = self.input.get() {
             if *x != '"' {
                 buffer.push(*x);
-                self.input.next();
+                self.read_next();
             } else {
                 break;
             }
         }
-        self.curr_char = self.curr_char.wrapping_add(buffer.len());
 
         Ok(buffer)
     }
@@ -214,7 +220,7 @@ impl Iterator for Lexer<'_> {
     fn next(&mut self) -> Option<Self::Item> {
         self.skip_spaces();
         let char_nbr = self.curr_char;
-        let start_position = self.input.idx();
+        let start_idx = self.input.idx();
         let res = match self.input.get()? {
             'a'..='z' | 'A'..='Z' => {
                 let ident = self.read_identifier();
@@ -236,9 +242,10 @@ impl Iterator for Lexer<'_> {
                         _ => Some(TokenType::Identifier(ident)),
                     },
                     Err(_) => Some(TokenType::InValid(LexerError::new_string(
-                        start_position,
+                        char_nbr,
+                        self.curr_line,
                         self.input
-                            .n_slice(start_position)
+                            .n_slice(start_idx)
                             .unwrap()
                             .iter()
                             .collect::<String>(),
@@ -250,9 +257,10 @@ impl Iterator for Lexer<'_> {
                     // should never panic because read_number only reads numbers
                     .map_or(
                         TokenType::InValid(LexerError::new_string(
-                            start_position,
+                            char_nbr,
+                            self.curr_line,
                             self.input
-                                .n_slice(start_position)
+                                .n_slice(start_idx)
                                 .unwrap()
                                 .iter()
                                 .collect::<String>(),
@@ -295,31 +303,44 @@ impl Iterator for Lexer<'_> {
             '!' => {
                 if let Some(peak) = self.input.peak() {
                     if *peak == '=' {
-                        self.input.next();
+                        self.read_next();
                         Some(TokenType::NotEquals)
                     } else {
-                        Some(TokenType::InValid(LexerError::empty()))
+                        Some(TokenType::InValid(LexerError::new_string(
+                            char_nbr,
+                            self.curr_line,
+                            self.input.n_slice(start_idx).unwrap().iter().collect(),
+                        )))
                     }
                 } else {
-                    Some(TokenType::InValid(LexerError::empty()))
+                    Some(TokenType::InValid(LexerError::new_string(
+                        char_nbr,
+                        self.curr_line,
+                        self.input.n_slice(start_idx).unwrap().iter().collect(),
+                    )))
                 }
             }
             '"' => Some(self.read_string().map_or(
-                TokenType::InValid(LexerError::empty()),
+                TokenType::InValid(LexerError::new_string(
+                    char_nbr,
+                    self.curr_line,
+                    self.input.n_slice(start_idx).unwrap().iter().collect(),
+                )),
                 TokenType::StringLiteral,
             )),
             ',' => Some(TokenType::Comma),
             '\0' => None,
             _ => Some(TokenType::InValid(LexerError::new_string(
-                start_position,
+                char_nbr,
+                self.curr_line,
                 self.input
-                    .n_slice(start_position)
+                    .n_slice(start_idx)
                     .unwrap()
                     .iter()
                     .collect::<String>(),
             ))),
         };
-        self.input.next();
+        self.read_next();
         Some(Token {
             inner: res?,
             line_nbr: self.curr_line,
@@ -461,27 +482,53 @@ mod tests {
             .collect::<Vec<_>>()
             .into_iter()
             .map(|d| d.token_type().clone());
-        assert_eq!(
-            token_types.next(),
-            Some(TokenType::InValid(LexerError::new_string(
-                0,
-                "@".to_string()
-            )))
-        )
+        let expected = Some(TokenType::InValid(LexerError::new_string(
+            1,
+            1,
+            "@".to_string(),
+        )));
+        assert_eq!(token_types.next(), expected)
     }
 
     #[test]
     fn test_shoudl_pass() {
-        let input: Vec<char> = "let x = 3".chars().collect();
+        let input: Vec<char> = "!= <><>".chars().collect();
         let lexer = Lexer::new(&input);
-        let mut tokens = lexer.collect::<Vec<_>>();
-        dbg!(tokens);
+        let tokens = lexer.collect::<Vec<_>>();
+        let expected = vec![
+            Token {
+                inner: TokenType::NotEquals,
+                line_nbr: 1,
+                char_nbr: 1,
+            },
+            Token {
+                inner: TokenType::LessThan,
+                line_nbr: 1,
+                char_nbr: 4,
+            },
+            Token {
+                inner: TokenType::GreaterThan,
+                line_nbr: 1,
+                char_nbr: 5,
+            },
+            Token {
+                inner: TokenType::LessThan,
+                line_nbr: 1,
+                char_nbr: 6,
+            },
+            Token {
+                inner: TokenType::GreaterThan,
+                line_nbr: 1,
+                char_nbr: 7,
+            },
+        ];
+        assert_eq!(tokens, expected)
     }
 
     #[test]
     fn test_whitespace_handling() {
         let input: Vec<char> = "  let   x   =  5   ;   @@@@@".chars().collect();
-        let mut lexer = Lexer::new(&input);
+        let lexer = Lexer::new(&input);
         let mut lexer = lexer
             .collect::<Vec<_>>()
             .into_iter()
@@ -492,6 +539,25 @@ mod tests {
         assert_eq!(lexer.next(), Some(TokenType::Assign));
         assert_eq!(lexer.next(), Some(TokenType::Number(5)));
         assert_eq!(lexer.next(), Some(TokenType::SemiColon));
-        assert_eq!(lexer.next(), None);
+        assert_eq!(
+            lexer.next(),
+            Some(TokenType::InValid(LexerError::test(27, 1, "@")))
+        );
+        assert_eq!(
+            lexer.next(),
+            Some(TokenType::InValid(LexerError::test(28, 1, "@")))
+        );
+        assert_eq!(
+            lexer.next(),
+            Some(TokenType::InValid(LexerError::test(29, 1, "@")))
+        );
+        assert_eq!(
+            lexer.next(),
+            Some(TokenType::InValid(LexerError::test(30, 1, "@")))
+        );
+        assert_eq!(
+            lexer.next(),
+            Some(TokenType::InValid(LexerError::test(31, 1, "@")))
+        )
     }
 }
