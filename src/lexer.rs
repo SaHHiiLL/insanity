@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use crate::error::LexerError;
 
 use super::peaker::{Cursor, MoveBackIterator};
@@ -138,6 +140,7 @@ impl<'a> Lexer<'a> {
             if x.is_whitespace() {
                 if *x == '\n' {
                     self.curr_line += 1;
+                    self.curr_char = 0;
                 } else if *x == ' ' {
                     self.curr_char += 1;
                 } else {
@@ -160,6 +163,7 @@ impl<'a> Lexer<'a> {
                 break;
             }
         }
+        self.curr_char = self.curr_char.wrapping_add(buffer.len());
         // On success moves the cursor back
         self.input.prev().expect("Should Never fail");
         Ok(buffer)
@@ -175,6 +179,8 @@ impl<'a> Lexer<'a> {
                 break;
             }
         }
+
+        self.curr_char = self.curr_char.wrapping_add(buffer.len());
         // On success moves the cursor back
         self.input.prev().expect("Should Never fail");
         Ok(buffer)
@@ -192,6 +198,7 @@ impl<'a> Lexer<'a> {
                 break;
             }
         }
+        self.curr_char = self.curr_char.wrapping_add(buffer.len());
 
         Ok(buffer)
     }
@@ -323,6 +330,8 @@ impl Iterator for Lexer<'_> {
 
 mod tests {
     #![allow(unused_imports)]
+    use std::clone;
+
     use crate::{
         error::LexerError,
         lexer::{Token, TokenType},
@@ -459,6 +468,14 @@ mod tests {
                 "@".to_string()
             )))
         )
+    }
+
+    #[test]
+    fn test_shoudl_pass() {
+        let input: Vec<char> = "let x = 3".chars().collect();
+        let lexer = Lexer::new(&input);
+        let mut tokens = lexer.collect::<Vec<_>>();
+        dbg!(tokens);
     }
 
     #[test]
