@@ -1,5 +1,3 @@
-use std::fmt::Display;
-
 use crate::error::LexerError;
 
 use super::peaker::{Cursor, MoveBackIterator};
@@ -359,120 +357,117 @@ mod tests {
         Lexer,
     };
 
-    // #[test]
-    // fn test_lexer() {
-    //     let input = "(){()}=!=".chars().collect::<Vec<char>>();
-    //     let lexer = Lexer::new(&input);
-    //     let expected = &[
-    //         TokenType::LeftParen,
-    //         TokenType::RightParen,
-    //         TokenType::LeftBrace,
-    //         TokenType::LeftParen,
-    //         TokenType::RightParen,
-    //         TokenType::RightBrace,
-    //         TokenType::Assign,
-    //         TokenType::NotEquals,
-    //     ];
-    //
-    //     let lexed_tokens: Vec<TokenType> = lexer.collect();
-    //     assert_eq!(lexed_tokens.len(), expected.len());
-    //     assert_eq!(lexed_tokens, expected);
-    // }
-    //
-    // #[test]
-    // fn test_string() {
-    //     let input = "\"Hello World\"".chars().collect::<Vec<char>>();
-    //     let lexer = Lexer::new(&input);
-    //     let expected = &[TokenType::StringLiteral("Hello World".to_string())];
-    //
-    //     let lexed_tokens: Vec<TokenType> = lexer.collect();
-    //     assert_eq!(lexed_tokens.len(), expected.len());
-    //     assert_eq!(lexed_tokens, expected);
-    // }
-    //
-    // #[test]
-    // fn test_ident() {
-    //     let input = "Hey world!= == ()".chars().collect::<Vec<char>>();
-    //     let lexer = Lexer::new(&input);
-    //     let expected = &[
-    //         TokenType::Identifier("Hey".to_string()),
-    //         TokenType::Identifier("world".to_string()),
-    //         TokenType::NotEquals,
-    //         TokenType::Assign,
-    //         TokenType::Assign,
-    //         TokenType::LeftParen,
-    //         TokenType::RightParen,
-    //     ];
-    //
-    //     let lexed_tokens: Vec<TokenType> = lexer.collect();
-    //     assert_eq!(lexed_tokens.len(), expected.len());
-    //     assert_eq!(lexed_tokens, expected);
-    // }
-    //
-    // #[test]
-    // fn test_function() {
-    //     let input = r##"
-    //         fn foo() {
-    //             let bar = "Hello World!";
-    //             return -1337;
-    //         }
-    //     "##;
-    //
-    //     let expected = vec![
-    //         TokenType::Function,
-    //         TokenType::Identifier("foo".to_string()),
-    //         TokenType::LeftParen,
-    //         TokenType::RightParen,
-    //         TokenType::LeftBrace,
-    //         TokenType::Let,
-    //         TokenType::Identifier("bar".to_string()),
-    //         TokenType::Assign,
-    //         TokenType::StringLiteral("Hello World!".to_string()),
-    //         TokenType::SemiColon,
-    //         TokenType::Return,
-    //         TokenType::Minus,
-    //         TokenType::Number(1337),
-    //         TokenType::SemiColon,
-    //         TokenType::RightBrace,
-    //     ];
-    //     let chars = &input.chars().collect::<Vec<char>>();
-    //     let lexer = Lexer::new(chars);
-    //     let lexer_token = lexer.collect::<Vec<TokenType>>();
-    //     assert_eq!(lexer_token.len(), expected.len());
-    //     assert_eq!(lexer_token, expected);
-    // }
-    //
-    // #[test]
-    // fn test_let_statement() {
-    //     let input: Vec<char> = "let x = 42;".chars().collect();
-    //     let mut lexer = Lexer::new(&input);
-    //     assert_eq!(lexer.next(), Some(TokenType::Let));
-    //     assert_eq!(lexer.next(), Some(TokenType::Identifier("x".to_string())));
-    //     assert_eq!(lexer.next(), Some(TokenType::Assign));
-    //     assert_eq!(lexer.next(), Some(TokenType::Number(42)));
-    //     assert_eq!(lexer.next(), Some(TokenType::SemiColon));
-    //     assert_eq!(lexer.next(), None);
-    // }
-    //
-    // #[test]
-    // fn test_if_branch() {
-    //     let input: Vec<char> = "if (x < 10) { return x + 1; }".chars().collect();
-    //     let mut lexer = Lexer::new(&input);
-    //     assert_eq!(lexer.next(), Some(TokenType::If));
-    //     assert_eq!(lexer.next(), Some(TokenType::LeftParen));
-    //     assert_eq!(lexer.next(), Some(TokenType::Identifier("x".to_string())));
-    //     assert_eq!(lexer.next(), Some(TokenType::LessThan));
-    //     assert_eq!(lexer.next(), Some(TokenType::Number(10)));
-    //     assert_eq!(lexer.next(), Some(TokenType::RightParen));
-    //     assert_eq!(lexer.next(), Some(TokenType::LeftBrace));
-    //     assert_eq!(lexer.next(), Some(TokenType::Return));
-    //     assert_eq!(lexer.next(), Some(TokenType::Identifier("x".to_string())));
-    //     assert_eq!(lexer.next(), Some(TokenType::Add));
-    //     assert_eq!(lexer.next(), Some(TokenType::Number(1)));
-    //     assert_eq!(lexer.next(), Some(TokenType::SemiColon));
-    //     assert_eq!(lexer.next(), Some(TokenType::RightBrace));
-    //     assert_eq!(lexer.next(), None);
-    // }
+    #[test]
+    fn test_lexer() {
+        let input = "(){()}=!=".chars().collect::<Vec<char>>();
+        let lexer = Lexer::new(&input);
+        let expected = &[
+            TokenType::LeftParen,
+            TokenType::RightParen,
+            TokenType::LeftBrace,
+            TokenType::LeftParen,
+            TokenType::RightParen,
+            TokenType::RightBrace,
+            TokenType::Assign,
+            TokenType::NotEquals,
+        ];
+
+        let lexed_tokens = lexer.map(|x| x.token_type().clone()).collect::<Vec<_>>();
+        assert_eq!(lexed_tokens.len(), expected.len());
+        assert_eq!(lexed_tokens, expected);
+    }
+    #[test]
+    fn test_string() {
+        let input = "\"Hello World\"".chars().collect::<Vec<char>>();
+        let lexer = Lexer::new(&input);
+        let expected = &[TokenType::StringLiteral("Hello World".to_string())];
+
+        let lexed_tokens: Vec<TokenType> = lexer.map(|d| d.token_type().clone()).collect();
+        assert_eq!(lexed_tokens.len(), expected.len());
+        assert_eq!(lexed_tokens, expected);
+    }
+    #[test]
+    fn test_ident() {
+        let input = "Hey world!= == ()".chars().collect::<Vec<char>>();
+        let lexer = Lexer::new(&input);
+        let expected = &[
+            TokenType::Identifier("Hey".to_string()),
+            TokenType::Identifier("world".to_string()),
+            TokenType::NotEquals,
+            TokenType::Assign,
+            TokenType::Assign,
+            TokenType::LeftParen,
+            TokenType::RightParen,
+        ];
+
+        let lexed_tokens: Vec<TokenType> = lexer.map(|d| d.token_type().clone()).collect();
+        assert_eq!(lexed_tokens.len(), expected.len());
+        assert_eq!(lexed_tokens, expected);
+    }
+    #[test]
+    fn test_function() {
+        let input = r##"
+            fn foo() {
+                let bar = "Hello World!";
+                return -1337;
+            }
+        "##;
+
+        let expected = vec![
+            TokenType::Function,
+            TokenType::Identifier("foo".to_string()),
+            TokenType::LeftParen,
+            TokenType::RightParen,
+            TokenType::LeftBrace,
+            TokenType::Let,
+            TokenType::Identifier("bar".to_string()),
+            TokenType::Assign,
+            TokenType::StringLiteral("Hello World!".to_string()),
+            TokenType::SemiColon,
+            TokenType::Return,
+            TokenType::Minus,
+            TokenType::Number(1337),
+            TokenType::SemiColon,
+            TokenType::RightBrace,
+        ];
+        let chars = &input.chars().collect::<Vec<char>>();
+        let lexer = Lexer::new(chars);
+        let lexed_tokens: Vec<TokenType> = lexer.map(|d| d.token_type().clone()).collect();
+        assert_eq!(lexed_tokens.len(), expected.len());
+        assert_eq!(lexed_tokens, expected);
+    }
+
+    #[test]
+    fn test_let_statement() {
+        let input: Vec<char> = "let x = 42;".chars().collect();
+        let mut lexer = Lexer::new(&input).map(|d| d.token_type().clone());
+        assert_eq!(lexer.next(), Some(TokenType::Let));
+        assert_eq!(lexer.next(), Some(TokenType::Identifier("x".to_string())));
+        assert_eq!(lexer.next(), Some(TokenType::Assign));
+        assert_eq!(lexer.next(), Some(TokenType::Number(42)));
+        assert_eq!(lexer.next(), Some(TokenType::SemiColon));
+        assert_eq!(lexer.next(), None);
+    }
+
+    #[test]
+    fn test_if_branch() {
+        let input: Vec<char> = "if (x < 10) { return x + 1; }".chars().collect();
+        let mut lexer = Lexer::new(&input).map(|d| d.token_type().clone());
+        assert_eq!(lexer.next(), Some(TokenType::If));
+        assert_eq!(lexer.next(), Some(TokenType::LeftParen));
+        assert_eq!(lexer.next(), Some(TokenType::Identifier("x".to_string())));
+        assert_eq!(lexer.next(), Some(TokenType::LessThan));
+        assert_eq!(lexer.next(), Some(TokenType::Number(10)));
+        assert_eq!(lexer.next(), Some(TokenType::RightParen));
+        assert_eq!(lexer.next(), Some(TokenType::LeftBrace));
+        assert_eq!(lexer.next(), Some(TokenType::Return));
+        assert_eq!(lexer.next(), Some(TokenType::Identifier("x".to_string())));
+        assert_eq!(lexer.next(), Some(TokenType::Add));
+        assert_eq!(lexer.next(), Some(TokenType::Number(1)));
+        assert_eq!(lexer.next(), Some(TokenType::SemiColon));
+        assert_eq!(lexer.next(), Some(TokenType::RightBrace));
+        assert_eq!(lexer.next(), None);
+    }
 
     #[test]
     fn test_invalid_token() {

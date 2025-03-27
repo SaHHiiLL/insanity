@@ -67,6 +67,6 @@ mod test {
         .collect::<Vec<char>>();
         let lexer = Lexer::new(&input);
         let mut parser = Parser::new(lexer);
-        parser.parse();
+        parser.parse().unwrap();
     }
 }

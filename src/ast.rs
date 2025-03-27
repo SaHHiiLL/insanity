@@ -22,6 +22,7 @@ pub(crate) struct ProcessStatement {
 pub(crate) enum Expression {
     Identifier(Identifier),
     StringLiteral(Literal),
+    NumberLiteral(i64),
 }
 
 impl TryFrom<Vec<Token>> for Expression {
@@ -34,7 +35,7 @@ impl TryFrom<Vec<Token>> for Expression {
             .ok_or(ParserError::ExpectedExpression("None".to_string()))?;
         let token_type = x.token_type();
         match token_type {
-            TokenType::Number(_) => todo!(),
+            TokenType::Number(num) => Ok(Expression::NumberLiteral(num.clone())),
             TokenType::Identifier(_) => todo!(),
             TokenType::StringLiteral(literal_value) => Ok(Expression::StringLiteral(
                 Literal::from(literal_value.to_owned()),
