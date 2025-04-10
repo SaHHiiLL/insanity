@@ -1,6 +1,6 @@
 use crate::error::LexerError;
 
-use super::peeker::{Cursor, MoveBackIterator};
+use super::peeker::Cursor;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Token {

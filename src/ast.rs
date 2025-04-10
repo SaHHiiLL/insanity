@@ -86,10 +86,10 @@ fn parse_let(tokens: &mut Cursor<Token>) -> AstResult<AstNode> {
         {
             // parse the expression at the end
             let expression = Box::new(parse_expression(tokens)?);
-            return Ok(AstNode::Assignment {
+            Ok(AstNode::Assignment {
                 ident: ident.token_type().to_string(),
                 expression,
-            });
+            })
         } else {
             panic!("Expected assign token after identifier");
         }
@@ -160,27 +160,25 @@ fn parse_expression(tokens: &mut Cursor<Token>) -> AstResult<AstNode> {
                     .is_some()
                 {
                     return Ok(AstNode::StringLiteral(string.clone()));
-                } else {
-                    if tokens
-                        .next_if(|t| *t.token_type() == TokenType::Add)
-                        .is_some()
-                    {
-                        let rhs = parse_expression(tokens)?;
-                        match rhs {
-                            AstNode::StringLiteral(rhs_string) => {
-                                return Ok(AstNode::StringLiteral(format!(
-                                    "{}{}",
-                                    string, rhs_string
-                                )));
-                            }
-                            _ => {
-                                panic!("Expected string literal after +")
-                            }
+                } else if tokens
+                    .next_if(|t| *t.token_type() == TokenType::Add)
+                    .is_some()
+                {
+                    let rhs = parse_expression(tokens)?;
+                    match rhs {
+                        AstNode::StringLiteral(rhs_string) => {
+                            return Ok(AstNode::StringLiteral(format!(
+                                "{}{}",
+                                string, rhs_string
+                            )));
                         }
-                    } else {
-                        // "String A" "String B" -> "String AString B"
-                        // "String A", "String B" -> "String A String B"
+                        _ => {
+                            panic!("Expected string literal after +")
+                        }
                     }
+                } else {
+                    // "String A" "String B" -> "String AString B"
+                    // "String A", "String B" -> "String A String B"
                 }
             }
             TokenType::Identifier(ident) => {
