@@ -1,6 +1,6 @@
 use crate::error::LexerError;
 
-use super::peaker::{Cursor, MoveBackIterator};
+use super::peeker::{Cursor, MoveBackIterator};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Token {
@@ -22,11 +22,11 @@ impl std::fmt::Display for Token {
 impl std::fmt::Display for TokenType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let x = match self {
-            TokenType::Identifier(ident) => &format!("Identifier({})", ident),
-            TokenType::Number(num) => &format!("Number({})", num),
-            TokenType::StringLiteral(literal) => &format!("StringLiteral({})", literal),
-            TokenType::Let => "Let",
-            TokenType::Return => "Return",
+            TokenType::Identifier(ident) => &format!("{}", ident),
+            TokenType::Number(num) => &format!("{}", num),
+            TokenType::StringLiteral(literal) => &format!("{}", literal),
+            TokenType::Let => "let",
+            TokenType::Return => "return",
             TokenType::Process => "Process",
             TokenType::Function => "Function",
             TokenType::True => "True",
@@ -95,8 +95,11 @@ pub enum TokenType {
     Else,
     ElseIf,
 
+    // clone parenthesis
     RightParen,
+    // Open parenthesis
     LeftParen,
+
     RightBrace,
     LeftBrace,
     Comma,
@@ -113,19 +116,19 @@ pub enum TokenType {
     GreaterOrEqualThan,
     GreaterThan,
 
-    // InValid(ErrorStruct)
     InValid(crate::error::LexerError),
 }
 
-#[derive(Debug, Clone)]
-pub struct Lexer<'a> {
-    input: Cursor<'a, char>,
+#[derive(Debug)]
+pub struct Lexer {
+    input: Cursor<char>,
     curr_line: usize,
     curr_char: usize,
 }
 
-impl<'a> Lexer<'a> {
-    pub fn new(input: &'a [char]) -> Self {
+impl Lexer {
+    pub fn new(input: &[char]) -> Self {
+        let input = input.iter().map(|d| d.clone()).collect::<Vec<_>>();
         Self {
             input: Cursor::new(input),
             curr_line: 1,
@@ -138,7 +141,7 @@ impl<'a> Lexer<'a> {
             if x.is_whitespace() {
                 if *x == '\n' {
                     self.curr_line += 1;
-                    self.curr_char = 0;
+                    self.curr_char = 1;
                 }
                 self.read_next();
             } else {
@@ -179,11 +182,11 @@ impl<'a> Lexer<'a> {
     }
 
     /// Reads the next char and increments the line number and current char number incase of Some()
-    fn read_next(&mut self) -> Option<&'_ char> {
+    fn read_next(&mut self) -> Option<char> {
         self.input.next().map(|c| {
-            if *c == '\n' {
+            if c == '\n' {
                 self.curr_line += 1;
-                self.curr_char = 0;
+                self.curr_char = 1;
             } else {
                 self.curr_char += 1;
             }
@@ -206,13 +209,15 @@ impl<'a> Lexer<'a> {
 
         Ok(buffer)
     }
+}
 
-    pub fn peak(&self) -> Option<Token> {
-        self.clone().next()
+impl From<String> for Lexer {
+    fn from(value: String) -> Self {
+        Self::new(&value.chars().collect::<Vec<char>>())
     }
 }
 
-impl Iterator for Lexer<'_> {
+impl Iterator for Lexer {
     type Item = Token;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -277,7 +282,7 @@ impl Iterator for Lexer<'_> {
             '{' => Some(TokenType::LeftBrace),
             '=' => Some(TokenType::Assign),
             '<' => {
-                if let Some(peak) = self.input.peak() {
+                if let Some(peak) = self.input.peek_ahead() {
                     if *peak == '=' {
                         Some(TokenType::LessOrEqualThan)
                     } else {
@@ -288,7 +293,7 @@ impl Iterator for Lexer<'_> {
                 }
             }
             '>' => {
-                if let Some(peak) = self.input.peak() {
+                if let Some(peak) = self.input.peek_ahead() {
                     if *peak == '=' {
                         Some(TokenType::GreaterOrEqualThan)
                     } else {
@@ -299,7 +304,7 @@ impl Iterator for Lexer<'_> {
                 }
             }
             '!' => {
-                if let Some(peak) = self.input.peak() {
+                if let Some(peak) = self.input.peek_ahead() {
                     if *peak == '=' {
                         self.read_next();
                         Some(TokenType::NotEquals)

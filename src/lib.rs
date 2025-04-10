@@ -2,8 +2,6 @@
 mod ast;
 mod error;
 mod lexer;
-mod parser;
-mod peaker;
+mod peeker;
 
 pub use self::lexer::Lexer;
-pub use self::parser::Parser;

@@ -1,6 +1,6 @@
 use thiserror::Error;
 
-use crate::lexer::Token;
+use crate::lexer::{Token, TokenType};
 
 #[derive(Error, Debug, Clone, Eq, PartialEq)]
 pub struct LexerError {
@@ -63,6 +63,8 @@ pub enum ParserError {
     ExpectedExpression(String),
     InvalidExpression(Token),
     InvalidIdentifier(Token),
+    ExpectedTokenGotNone(TokenType),
+    ExpectedToken(Token, TokenType),
 }
 
 impl std::fmt::Display for ParserError {
@@ -79,6 +81,12 @@ impl std::fmt::Display for ParserError {
                 }
                 Self::InvalidIdentifier(token) => {
                     format!("InvalidIdentifier {{ {} }}", token)
+                }
+                Self::ExpectedTokenGotNone(token_type) => {
+                    format!("ExpectedTokenGotNone {{ {} }}", token_type)
+                }
+                Self::ExpectedToken(token, token_type) => {
+                    format!("ExpectedToken {{ {}, {} }}", token, token_type)
                 }
             }
         )

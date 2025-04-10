@@ -1,115 +1,265 @@
-// https://github.com/ThePrimeagen/ts-rust-zig-deez/blob/3441b21d30a8d8488f2bec85cef4f9054891e9ea/rust_dr/src/ast/mod.rs
-
 use crate::{
     error::ParserError,
     lexer::{Token, TokenType},
-    peaker::Cursor,
+    peeker::Cursor,
 };
 
-#[derive(Debug)]
-pub(crate) enum Statement {
-    Let(LetStatement),
-    Return(ReturnStatement),
-    ProcessCall(ProcessStatement),
+type BAstNode = Box<AstNode>;
+
+#[derive(Debug, PartialEq)]
+pub(crate) enum ArithmeticType {
+    Addition,
+    Subtraction,
+    Multiplication,
+    Division,
 }
 
-#[derive(Debug)]
-pub(crate) struct ProcessStatement {
-    expression: Expression,
+#[derive(Debug, PartialEq)]
+pub(crate) enum LogicalType {
+    Equals,
+    NotEquals,
 }
 
-#[derive(Debug)]
-pub(crate) enum Expression {
-    Identifier(Identifier),
-    StringLiteral(Literal),
-    NumberLiteral(i64),
+#[derive(Debug, PartialEq)]
+pub(crate) enum AstNode {
+    Assignment {
+        ident: String,
+        expression: BAstNode,
+    },
+    Identifier {
+        ident: String,
+    },
+    Return {
+        expression: BAstNode,
+    },
+    StringLiteral(String),
+    Scope(Vec<BAstNode>),
+    Number(i64),
+    Float(f64),
+    Arithmetic {
+        lhs: BAstNode,
+        rhs: BAstNode,
+        arithmetic_type: ArithmeticType,
+    },
+
+    Logical {
+        lhs: BAstNode,
+        rhs: BAstNode,
+        logical_type: LogicalType,
+    },
+    Boolean(bool),
+    Paren(BAstNode),
+    EmptyExpression,
 }
 
-impl TryFrom<Vec<Token>> for Expression {
-    type Error = ParserError;
+type AstResult<T> = Result<T, ParserError>;
 
-    fn try_from(value: Vec<Token>) -> Result<Self, Self::Error> {
-        let mut cursor = Cursor::new(&value);
-        let x = cursor
-            .next()
-            .ok_or(ParserError::ExpectedExpression("None".to_string()))?;
-        let token_type = x.token_type();
-        match token_type {
-            TokenType::Number(num) => Ok(Expression::NumberLiteral(num.clone())),
-            TokenType::Identifier(_) => todo!(),
-            TokenType::StringLiteral(literal_value) => Ok(Expression::StringLiteral(
-                Literal::from(literal_value.to_owned()),
-            )),
-            TokenType::True => todo!(),
-            TokenType::False => todo!(),
-            TokenType::Minus => todo!(),
-            _ => Err(ParserError::InvalidExpression(x.clone())),
+pub(crate) fn parse(tokens: Vec<Token>) -> Result<Vec<AstNode>, Vec<ParserError>> {
+    let mut errors: Vec<ParserError> = vec![];
+    let mut ast: Vec<AstNode> = vec![];
+    let mut token_cursor = Cursor::new(tokens);
+
+    while token_cursor.get().is_some() {
+        if let Some(_) = token_cursor.next_if(|t| *t.token_type() == TokenType::Let) {
+            match parse_let(&mut token_cursor) {
+                Ok(node) => {
+                    ast.push(node);
+                    // TODO: remove this
+                    token_cursor.next_if(|t| *t.token_type() == TokenType::SemiColon);
+                }
+                Err(e) => {
+                    errors.push(e);
+                    break;
+                }
+            }
         }
     }
+    Ok(ast)
 }
 
-#[derive(Debug)]
-pub(crate) struct Program {
-    statements: Vec<Statement>,
-}
-
-impl Program {
-    pub(crate) fn new() -> Self {
-        Self { statements: vec![] }
+fn parse_let(tokens: &mut Cursor<Token>) -> AstResult<AstNode> {
+    if let Some(ident) = tokens.next_if(|t| matches!(t.token_type(), TokenType::Identifier(_))) {
+        if let Some(_) = tokens.next_if(|t| *t.token_type() == TokenType::Assign) {
+            // parse the expression at the end
+            let expression = Box::new(parse_expression(tokens)?);
+            return Ok(AstNode::Assignment {
+                ident: ident.token_type().to_string(),
+                expression,
+            });
+        } else {
+            panic!("Expected assign token after identifier");
+        }
+    } else {
+        panic!("Expected identifier after let");
     }
+    todo!()
 }
 
-#[derive(Debug)]
-pub(crate) struct LetStatement {
-    ident: Identifier,
-    value: Expression,
-}
+fn parse_expression(tokens: &mut Cursor<Token>) -> AstResult<AstNode> {
+    while let Some(token) = tokens.next_if(|t| *t.token_type() != TokenType::SemiColon) {
+        match token.token_type() {
+            TokenType::Number(num) => {
+                if let Some(_) = tokens.next_if(|t| *t.token_type() == TokenType::SemiColon) {
+                    return Ok(AstNode::Number(num.clone()));
+                } else {
+                    // We have something else to parse such as a binary expression or arithmetic
+                    match tokens.next() {
+                        Some(next_token) => match next_token.token_type() {
+                            TokenType::Add => {
+                                let rhs = parse_expression(tokens)?;
+                                return Ok(AstNode::Arithmetic {
+                                    lhs: Box::new(AstNode::Number(num.clone())),
+                                    rhs: Box::new(rhs),
+                                    arithmetic_type: ArithmeticType::Addition,
+                                });
+                            }
+                            TokenType::Minus => {
+                                let rhs = parse_expression(tokens)?;
+                                return Ok(AstNode::Arithmetic {
+                                    lhs: Box::new(AstNode::Number(num.clone())),
+                                    rhs: Box::new(rhs),
+                                    arithmetic_type: ArithmeticType::Subtraction,
+                                });
+                            }
+                            TokenType::Multiply => {
+                                let rhs = parse_expression(tokens)?;
+                                return Ok(AstNode::Arithmetic {
+                                    lhs: Box::new(AstNode::Number(num.clone())),
+                                    rhs: Box::new(rhs),
+                                    arithmetic_type: ArithmeticType::Multiplication,
+                                });
+                            }
+                            TokenType::Divide => {
+                                let rhs = parse_expression(tokens)?;
+                                return Ok(AstNode::Arithmetic {
+                                    lhs: Box::new(AstNode::Number(num.clone())),
+                                    rhs: Box::new(rhs),
+                                    arithmetic_type: ArithmeticType::Division,
+                                });
+                            }
 
-impl LetStatement {
-    pub(crate) fn new(ident: Identifier, expression: Expression) -> Self {
-        Self {
-            ident,
-            value: expression,
+                            _ => {
+                                todo!("Case not handled: {:?}", next_token.token_type())
+                            }
+                        },
+                        None => {
+                            return Err(ParserError::ExpectedTokenGotNone(TokenType::SemiColon))
+                        }
+                    }
+                }
+            }
+            TokenType::StringLiteral(string) => {
+                return Ok(AstNode::StringLiteral(string.clone()));
+            }
+            TokenType::Identifier(ident) => {
+                return Ok(AstNode::Identifier {
+                    ident: ident.clone(),
+                });
+            }
+            _ => todo!("Case not handled: {:?}", token),
         }
     }
+    panic!("Expected semicolon")
 }
 
-#[derive(Debug)]
-pub(crate) struct ReturnStatement {
-    value: Expression,
-}
+#[cfg(test)]
+mod test {
+    use crate::ast;
+    use crate::Lexer;
 
-#[derive(Debug)]
-pub(crate) struct Identifier {
-    name: String,
-}
+    #[test]
+    fn test_let_statement() {
+        let input = String::from("let x = 10;");
+        let lexer = Lexer::from(input);
+        let tokens = lexer.collect::<Vec<_>>();
+        let program = ast::parse(dbg!(tokens));
+        assert!(program.is_ok() == true);
+    }
 
-impl TryFrom<Token> for Identifier {
-    type Error = ParserError;
-
-    fn try_from(value: Token) -> Result<Self, Self::Error> {
-        match value.token_type() {
-            TokenType::Identifier(ident) => Ok(Self {
-                name: ident.to_owned(),
+    #[test]
+    fn test_let_statement_arithmetic() {
+        let input = String::from("let x = 10 + 20;");
+        let lexer = Lexer::from(input);
+        let tokens = lexer.collect::<Vec<_>>();
+        let program = dbg!(ast::parse(tokens));
+        assert!(program.is_ok() == true);
+        let program = program.unwrap();
+        let expected = vec![ast::AstNode::Assignment {
+            ident: String::from("x"),
+            expression: Box::new(ast::AstNode::Arithmetic {
+                lhs: Box::new(ast::AstNode::Number(10)),
+                rhs: Box::new(ast::AstNode::Number(20)),
+                arithmetic_type: ast::ArithmeticType::Addition,
             }),
-            _ => Err(ParserError::InvalidIdentifier(value)),
-        }
-    }
-}
+        }];
+        assert_eq!(program, expected);
 
-impl Identifier {
-    pub(crate) fn new(ident: String) -> Self {
-        Self { name: ident }
-    }
-}
+        let input = String::from("let x = 10 - 20;");
+        let lexer = Lexer::from(input);
+        let tokens = lexer.collect::<Vec<_>>();
+        let program = dbg!(ast::parse(tokens));
+        assert!(program.is_ok() == true);
+        let program = program.unwrap();
+        let expected = vec![ast::AstNode::Assignment {
+            ident: String::from("x"),
+            expression: Box::new(ast::AstNode::Arithmetic {
+                lhs: Box::new(ast::AstNode::Number(10)),
+                rhs: Box::new(ast::AstNode::Number(20)),
+                arithmetic_type: ast::ArithmeticType::Subtraction,
+            }),
+        }];
+        assert_eq!(program, expected);
 
-#[derive(Debug)]
-pub(crate) struct Literal {
-    value: String,
-}
+        let input = String::from("let x = 10 * 20;");
+        let lexer = Lexer::from(input);
+        let tokens = lexer.collect::<Vec<_>>();
+        let program = dbg!(ast::parse(tokens));
+        assert!(program.is_ok() == true);
+        let program = program.unwrap();
+        let expected = vec![ast::AstNode::Assignment {
+            ident: String::from("x"),
+            expression: Box::new(ast::AstNode::Arithmetic {
+                lhs: Box::new(ast::AstNode::Number(10)),
+                rhs: Box::new(ast::AstNode::Number(20)),
+                arithmetic_type: ast::ArithmeticType::Multiplication,
+            }),
+        }];
+        assert_eq!(program, expected);
 
-impl From<String> for Literal {
-    fn from(value: String) -> Self {
-        Self { value }
+        let input = String::from("let x = 10 / 20;");
+        let lexer = Lexer::from(input);
+        let tokens = lexer.collect::<Vec<_>>();
+        let program = dbg!(ast::parse(tokens));
+        assert!(program.is_ok() == true);
+        let program = program.unwrap();
+        let expected = vec![ast::AstNode::Assignment {
+            ident: String::from("x"),
+            expression: Box::new(ast::AstNode::Arithmetic {
+                lhs: Box::new(ast::AstNode::Number(10)),
+                rhs: Box::new(ast::AstNode::Number(20)),
+                arithmetic_type: ast::ArithmeticType::Division,
+            }),
+        }];
+        assert_eq!(program, expected);
+
+        let input = String::from("let x = 10 / 20 + 30;");
+        let lexer = Lexer::from(input);
+        let tokens = lexer.collect::<Vec<_>>();
+        let program = dbg!(ast::parse(tokens));
+        assert!(program.is_ok() == true);
+        let program = program.unwrap();
+        let expected = vec![ast::AstNode::Assignment {
+            ident: String::from("x"),
+            expression: Box::new(ast::AstNode::Arithmetic {
+                lhs: Box::new(ast::AstNode::Number(10)),
+                rhs: Box::new(ast::AstNode::Arithmetic {
+                    lhs: Box::new(ast::AstNode::Number(20)),
+                    rhs: Box::new(ast::AstNode::Number(30)),
+                    arithmetic_type: ast::ArithmeticType::Addition,
+                }),
+                arithmetic_type: ast::ArithmeticType::Division,
+            }),
+        }];
+        assert_eq!(program, expected);
     }
 }
