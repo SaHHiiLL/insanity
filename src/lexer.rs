@@ -150,18 +150,45 @@ impl Lexer {
         }
     }
 
+    fn read_with_filter(&mut self, func: impl FnOnce(char) -> bool) -> Result<String, ()> {
+        let mut buffer = String::new();
+        while let Some(x) = self.input.get() {
+            if func(*x) {
+                buffer.push(*x);
+                if let Some(next) = self.input.peek_ahead() {
+                    if func(*next) {
+                        self.read_next();
+                    } else {
+                        break;
+                    }
+                } else {
+                    break;
+                }
+            } else {
+                break;
+            }
+        }
+        Ok(buffer)
+    }
+
     fn read_identifier(&mut self) -> Result<String, ()> {
         let mut buffer = String::new();
         while let Some(x) = self.input.get() {
             if x.is_alphanumeric() || *x == '_' || *x == '-' {
                 buffer.push(*x);
-                self.read_next();
+                if let Some(next) = self.input.peek_ahead() {
+                    if next.is_alphanumeric() || *next == '_' || *next == '-' {
+                        self.read_next();
+                    } else {
+                        break;
+                    }
+                } else {
+                    break;
+                }
             } else {
                 break;
             }
         }
-        // On success moves the cursor back
-        self.input.prev().expect("Should Never fail");
         Ok(buffer)
     }
 
@@ -170,14 +197,19 @@ impl Lexer {
         while let Some(x) = self.input.get() {
             if x.is_numeric() {
                 buffer.push(*x);
-                self.read_next();
+                if let Some(next) = self.input.peek_ahead() {
+                    if next.is_numeric() {
+                        self.read_next();
+                    } else {
+                        break;
+                    }
+                } else {
+                    break;
+                }
             } else {
                 break;
             }
         }
-
-        // On success moves the cursor back
-        self.input.prev().expect("Should Never fail");
         Ok(buffer)
     }
 
@@ -360,6 +392,107 @@ mod tests {
         lexer::{Token, TokenType},
         Lexer,
     };
+
+    #[test]
+    fn test_check_char_and_line_nbr() {
+        let input = "let x = 42;".chars().collect::<Vec<char>>();
+        let lexer = Lexer::new(&input);
+        let tokens = lexer.collect::<Vec<_>>();
+        let expected = vec![
+            Token {
+                inner: TokenType::Let,
+                line_nbr: 1,
+                char_nbr: 1,
+            },
+            Token {
+                inner: TokenType::Identifier("x".to_string()),
+                line_nbr: 1,
+                char_nbr: 5,
+            },
+            Token {
+                inner: TokenType::Assign,
+                line_nbr: 1,
+                char_nbr: 7,
+            },
+            Token {
+                inner: TokenType::Number(42),
+                line_nbr: 1,
+                char_nbr: 9,
+            },
+            Token {
+                inner: TokenType::SemiColon,
+                line_nbr: 1,
+                char_nbr: 11,
+            },
+        ];
+        for (i, token) in tokens.iter().enumerate() {
+            assert_eq!(token.line_nbr, expected[i].line_nbr);
+            assert_eq!(token.char_nbr, expected[i].char_nbr);
+        }
+    }
+
+    #[test]
+    fn test_check_line_nbr() {
+        let input = "let x = 42;\nlet y = 43;".chars().collect::<Vec<char>>();
+        let lexer = Lexer::new(&input);
+        let tokens = lexer.collect::<Vec<_>>();
+        let expected = vec![
+            Token {
+                inner: TokenType::Let,
+                line_nbr: 1,
+                char_nbr: 1,
+            },
+            Token {
+                inner: TokenType::Identifier("x".to_string()),
+                line_nbr: 1,
+                char_nbr: 5,
+            },
+            Token {
+                inner: TokenType::Assign,
+                line_nbr: 1,
+                char_nbr: 7,
+            },
+            Token {
+                inner: TokenType::Number(42),
+                line_nbr: 1,
+                char_nbr: 9,
+            },
+            Token {
+                inner: TokenType::SemiColon,
+                line_nbr: 1,
+                char_nbr: 11,
+            },
+            Token {
+                inner: TokenType::Let,
+                line_nbr: 2,
+                char_nbr: 1,
+            },
+            Token {
+                inner: TokenType::Identifier("y".to_string()),
+                line_nbr: 2,
+                char_nbr: 5,
+            },
+            Token {
+                inner: TokenType::Assign,
+                line_nbr: 2,
+                char_nbr: 7,
+            },
+            Token {
+                inner: TokenType::Number(43),
+                line_nbr: 2,
+                char_nbr: 9,
+            },
+            Token {
+                inner: TokenType::SemiColon,
+                line_nbr: 2,
+                char_nbr: 11,
+            },
+        ];
+        for (i, token) in tokens.iter().enumerate() {
+            assert_eq!(token.line_nbr, expected[i].line_nbr);
+            assert_eq!(token.char_nbr, expected[i].char_nbr);
+        }
+    }
 
     #[test]
     fn test_lexer() {

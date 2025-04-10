@@ -60,12 +60,13 @@ pub(crate) fn parse(tokens: Vec<Token>) -> Result<Vec<AstNode>, Vec<ParserError>
     let mut token_cursor = Cursor::new(tokens);
 
     while token_cursor.get().is_some() {
-        if token_cursor.next_if(|t| *t.token_type() == TokenType::Let).is_some() {
+        if token_cursor
+            .next_if(|t| *t.token_type() == TokenType::Let)
+            .is_some()
+        {
             match parse_let(&mut token_cursor) {
                 Ok(node) => {
                     ast.push(node);
-                    // TODO: remove this
-                    token_cursor.next_if(|t| *t.token_type() == TokenType::SemiColon);
                 }
                 Err(e) => {
                     errors.push(e);
@@ -79,7 +80,10 @@ pub(crate) fn parse(tokens: Vec<Token>) -> Result<Vec<AstNode>, Vec<ParserError>
 
 fn parse_let(tokens: &mut Cursor<Token>) -> AstResult<AstNode> {
     if let Some(ident) = tokens.next_if(|t| matches!(t.token_type(), TokenType::Identifier(_))) {
-        if tokens.next_if(|t| *t.token_type() == TokenType::Assign).is_some() {
+        if tokens
+            .next_if(|t| *t.token_type() == TokenType::Assign)
+            .is_some()
+        {
             // parse the expression at the end
             let expression = Box::new(parse_expression(tokens)?);
             return Ok(AstNode::Assignment {
@@ -92,14 +96,16 @@ fn parse_let(tokens: &mut Cursor<Token>) -> AstResult<AstNode> {
     } else {
         panic!("Expected identifier after let");
     }
-    todo!()
 }
 
 fn parse_expression(tokens: &mut Cursor<Token>) -> AstResult<AstNode> {
     while let Some(token) = tokens.next_if(|t| *t.token_type() != TokenType::SemiColon) {
         match token.token_type() {
             TokenType::Number(num) => {
-                if tokens.next_if(|t| *t.token_type() == TokenType::SemiColon).is_some() {
+                if tokens
+                    .next_if(|t| *t.token_type() == TokenType::SemiColon)
+                    .is_some()
+                {
                     return Ok(AstNode::Number(*num));
                 } else {
                     // We have something else to parse such as a binary expression or arithmetic
@@ -149,7 +155,33 @@ fn parse_expression(tokens: &mut Cursor<Token>) -> AstResult<AstNode> {
                 }
             }
             TokenType::StringLiteral(string) => {
-                return Ok(AstNode::StringLiteral(string.clone()));
+                if tokens
+                    .next_if(|t| *t.token_type() == TokenType::SemiColon)
+                    .is_some()
+                {
+                    return Ok(AstNode::StringLiteral(string.clone()));
+                } else {
+                    if tokens
+                        .next_if(|t| *t.token_type() == TokenType::Add)
+                        .is_some()
+                    {
+                        let rhs = parse_expression(tokens)?;
+                        match rhs {
+                            AstNode::StringLiteral(rhs_string) => {
+                                return Ok(AstNode::StringLiteral(format!(
+                                    "{}{}",
+                                    string, rhs_string
+                                )));
+                            }
+                            _ => {
+                                panic!("Expected string literal after +")
+                            }
+                        }
+                    } else {
+                        // "String A" "String B" -> "String AString B"
+                        // "String A", "String B" -> "String A String B"
+                    }
+                }
             }
             TokenType::Identifier(ident) => {
                 return Ok(AstNode::Identifier {
