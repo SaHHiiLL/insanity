@@ -22,9 +22,9 @@ impl std::fmt::Display for Token {
 impl std::fmt::Display for TokenType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let x = match self {
-            TokenType::Identifier(ident) => &format!("{}", ident),
+            TokenType::Identifier(ident) => &ident.to_string(),
             TokenType::Number(num) => &format!("{}", num),
-            TokenType::StringLiteral(literal) => &format!("{}", literal),
+            TokenType::StringLiteral(literal) => &literal.to_string(),
             TokenType::Let => "let",
             TokenType::Return => "return",
             TokenType::Process => "Process",
@@ -128,7 +128,7 @@ pub struct Lexer {
 
 impl Lexer {
     pub fn new(input: &[char]) -> Self {
-        let input = input.iter().map(|d| d.clone()).collect::<Vec<_>>();
+        let input = input.to_vec();
         Self {
             input: Cursor::new(input),
             curr_line: 1,
@@ -183,14 +183,13 @@ impl Lexer {
 
     /// Reads the next char and increments the line number and current char number incase of Some()
     fn read_next(&mut self) -> Option<char> {
-        self.input.next().map(|c| {
+        self.input.next().inspect(|&c| {
             if c == '\n' {
                 self.curr_line += 1;
                 self.curr_char = 1;
             } else {
                 self.curr_char += 1;
             }
-            c
         })
     }
 

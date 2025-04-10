@@ -60,7 +60,7 @@ pub(crate) fn parse(tokens: Vec<Token>) -> Result<Vec<AstNode>, Vec<ParserError>
     let mut token_cursor = Cursor::new(tokens);
 
     while token_cursor.get().is_some() {
-        if let Some(_) = token_cursor.next_if(|t| *t.token_type() == TokenType::Let) {
+        if token_cursor.next_if(|t| *t.token_type() == TokenType::Let).is_some() {
             match parse_let(&mut token_cursor) {
                 Ok(node) => {
                     ast.push(node);
@@ -79,7 +79,7 @@ pub(crate) fn parse(tokens: Vec<Token>) -> Result<Vec<AstNode>, Vec<ParserError>
 
 fn parse_let(tokens: &mut Cursor<Token>) -> AstResult<AstNode> {
     if let Some(ident) = tokens.next_if(|t| matches!(t.token_type(), TokenType::Identifier(_))) {
-        if let Some(_) = tokens.next_if(|t| *t.token_type() == TokenType::Assign) {
+        if tokens.next_if(|t| *t.token_type() == TokenType::Assign).is_some() {
             // parse the expression at the end
             let expression = Box::new(parse_expression(tokens)?);
             return Ok(AstNode::Assignment {
@@ -99,8 +99,8 @@ fn parse_expression(tokens: &mut Cursor<Token>) -> AstResult<AstNode> {
     while let Some(token) = tokens.next_if(|t| *t.token_type() != TokenType::SemiColon) {
         match token.token_type() {
             TokenType::Number(num) => {
-                if let Some(_) = tokens.next_if(|t| *t.token_type() == TokenType::SemiColon) {
-                    return Ok(AstNode::Number(num.clone()));
+                if tokens.next_if(|t| *t.token_type() == TokenType::SemiColon).is_some() {
+                    return Ok(AstNode::Number(*num));
                 } else {
                     // We have something else to parse such as a binary expression or arithmetic
                     match tokens.next() {
@@ -108,7 +108,7 @@ fn parse_expression(tokens: &mut Cursor<Token>) -> AstResult<AstNode> {
                             TokenType::Add => {
                                 let rhs = parse_expression(tokens)?;
                                 return Ok(AstNode::Arithmetic {
-                                    lhs: Box::new(AstNode::Number(num.clone())),
+                                    lhs: Box::new(AstNode::Number(*num)),
                                     rhs: Box::new(rhs),
                                     arithmetic_type: ArithmeticType::Addition,
                                 });
@@ -116,7 +116,7 @@ fn parse_expression(tokens: &mut Cursor<Token>) -> AstResult<AstNode> {
                             TokenType::Minus => {
                                 let rhs = parse_expression(tokens)?;
                                 return Ok(AstNode::Arithmetic {
-                                    lhs: Box::new(AstNode::Number(num.clone())),
+                                    lhs: Box::new(AstNode::Number(*num)),
                                     rhs: Box::new(rhs),
                                     arithmetic_type: ArithmeticType::Subtraction,
                                 });
@@ -124,7 +124,7 @@ fn parse_expression(tokens: &mut Cursor<Token>) -> AstResult<AstNode> {
                             TokenType::Multiply => {
                                 let rhs = parse_expression(tokens)?;
                                 return Ok(AstNode::Arithmetic {
-                                    lhs: Box::new(AstNode::Number(num.clone())),
+                                    lhs: Box::new(AstNode::Number(*num)),
                                     rhs: Box::new(rhs),
                                     arithmetic_type: ArithmeticType::Multiplication,
                                 });
@@ -132,7 +132,7 @@ fn parse_expression(tokens: &mut Cursor<Token>) -> AstResult<AstNode> {
                             TokenType::Divide => {
                                 let rhs = parse_expression(tokens)?;
                                 return Ok(AstNode::Arithmetic {
-                                    lhs: Box::new(AstNode::Number(num.clone())),
+                                    lhs: Box::new(AstNode::Number(*num)),
                                     rhs: Box::new(rhs),
                                     arithmetic_type: ArithmeticType::Division,
                                 });
@@ -173,7 +173,7 @@ mod test {
         let lexer = Lexer::from(input);
         let tokens = lexer.collect::<Vec<_>>();
         let program = ast::parse(dbg!(tokens));
-        assert!(program.is_ok() == true);
+        assert!(program.is_ok());
     }
 
     #[test]
@@ -182,7 +182,7 @@ mod test {
         let lexer = Lexer::from(input);
         let tokens = lexer.collect::<Vec<_>>();
         let program = dbg!(ast::parse(tokens));
-        assert!(program.is_ok() == true);
+        assert!(program.is_ok());
         let program = program.unwrap();
         let expected = vec![ast::AstNode::Assignment {
             ident: String::from("x"),
@@ -198,7 +198,7 @@ mod test {
         let lexer = Lexer::from(input);
         let tokens = lexer.collect::<Vec<_>>();
         let program = dbg!(ast::parse(tokens));
-        assert!(program.is_ok() == true);
+        assert!(program.is_ok());
         let program = program.unwrap();
         let expected = vec![ast::AstNode::Assignment {
             ident: String::from("x"),
@@ -214,7 +214,7 @@ mod test {
         let lexer = Lexer::from(input);
         let tokens = lexer.collect::<Vec<_>>();
         let program = dbg!(ast::parse(tokens));
-        assert!(program.is_ok() == true);
+        assert!(program.is_ok());
         let program = program.unwrap();
         let expected = vec![ast::AstNode::Assignment {
             ident: String::from("x"),
@@ -230,7 +230,7 @@ mod test {
         let lexer = Lexer::from(input);
         let tokens = lexer.collect::<Vec<_>>();
         let program = dbg!(ast::parse(tokens));
-        assert!(program.is_ok() == true);
+        assert!(program.is_ok());
         let program = program.unwrap();
         let expected = vec![ast::AstNode::Assignment {
             ident: String::from("x"),
@@ -246,7 +246,7 @@ mod test {
         let lexer = Lexer::from(input);
         let tokens = lexer.collect::<Vec<_>>();
         let program = dbg!(ast::parse(tokens));
-        assert!(program.is_ok() == true);
+        assert!(program.is_ok());
         let program = program.unwrap();
         let expected = vec![ast::AstNode::Assignment {
             ident: String::from("x"),

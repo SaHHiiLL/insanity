@@ -199,8 +199,8 @@ mod tests {
 
     #[test]
     fn test_for_loop() {
-        let mut items = (1..100).collect::<Vec<_>>();
-        let mut cursor = Cursor::new(items.clone());
+        let items = (1..100).collect::<Vec<_>>();
+        let cursor = Cursor::new(items.clone());
         let mut items = items.iter();
         for x in cursor {
             assert_eq!(x, *items.next().unwrap());
