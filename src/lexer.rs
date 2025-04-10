@@ -150,13 +150,13 @@ impl Lexer {
         }
     }
 
-    fn read_with_filter(&mut self, func: impl FnOnce(char) -> bool) -> Result<String, ()> {
+    fn read_with_filter(&mut self, func: impl Fn(&char) -> bool) -> Result<String, ()> {
         let mut buffer = String::new();
         while let Some(x) = self.input.get() {
-            if func(*x) {
+            if func(x) {
                 buffer.push(*x);
                 if let Some(next) = self.input.peek_ahead() {
-                    if func(*next) {
+                    if func(next) {
                         self.read_next();
                     } else {
                         break;
@@ -172,45 +172,11 @@ impl Lexer {
     }
 
     fn read_identifier(&mut self) -> Result<String, ()> {
-        let mut buffer = String::new();
-        while let Some(x) = self.input.get() {
-            if x.is_alphanumeric() || *x == '_' || *x == '-' {
-                buffer.push(*x);
-                if let Some(next) = self.input.peek_ahead() {
-                    if next.is_alphanumeric() || *next == '_' || *next == '-' {
-                        self.read_next();
-                    } else {
-                        break;
-                    }
-                } else {
-                    break;
-                }
-            } else {
-                break;
-            }
-        }
-        Ok(buffer)
+        self.read_with_filter(|x| x.is_alphanumeric() || *x == '_' || *x == '-')
     }
 
     fn read_number(&mut self) -> Result<String, ()> {
-        let mut buffer = String::new();
-        while let Some(x) = self.input.get() {
-            if x.is_numeric() {
-                buffer.push(*x);
-                if let Some(next) = self.input.peek_ahead() {
-                    if next.is_numeric() {
-                        self.read_next();
-                    } else {
-                        break;
-                    }
-                } else {
-                    break;
-                }
-            } else {
-                break;
-            }
-        }
-        Ok(buffer)
+        self.read_with_filter(|x| x.is_numeric())
     }
 
     /// Reads the next char and increments the line number and current char number incase of Some()
@@ -673,23 +639,23 @@ mod tests {
         assert_eq!(lexer.next(), Some(TokenType::SemiColon));
         assert_eq!(
             lexer.next(),
+            Some(TokenType::InValid(LexerError::test(24, 1, "@")))
+        );
+        assert_eq!(
+            lexer.next(),
+            Some(TokenType::InValid(LexerError::test(25, 1, "@")))
+        );
+        assert_eq!(
+            lexer.next(),
+            Some(TokenType::InValid(LexerError::test(26, 1, "@")))
+        );
+        assert_eq!(
+            lexer.next(),
             Some(TokenType::InValid(LexerError::test(27, 1, "@")))
         );
         assert_eq!(
             lexer.next(),
             Some(TokenType::InValid(LexerError::test(28, 1, "@")))
-        );
-        assert_eq!(
-            lexer.next(),
-            Some(TokenType::InValid(LexerError::test(29, 1, "@")))
-        );
-        assert_eq!(
-            lexer.next(),
-            Some(TokenType::InValid(LexerError::test(30, 1, "@")))
-        );
-        assert_eq!(
-            lexer.next(),
-            Some(TokenType::InValid(LexerError::test(31, 1, "@")))
         )
     }
 }
