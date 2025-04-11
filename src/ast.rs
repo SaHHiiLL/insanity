@@ -175,7 +175,7 @@ fn handle_operators(tokens: &mut Cursor<Token>, lhs: AstNode) -> AstResult<AstNo
 }
 
 fn parse_expression(tokens: &mut Cursor<Token>) -> AstResult<AstNode> {
-    while let Some(token) = tokens.next_if(|t| *t.token_type() != TokenType::SemiColon) {
+    while let Some(token) = tokens.next() {
         match token.token_type() {
             TokenType::Number(num) => {
                 if tokens
@@ -220,6 +220,11 @@ fn parse_expression(tokens: &mut Cursor<Token>) -> AstResult<AstNode> {
                     return Ok(AstNode::Identifier {
                         ident: ident.to_string(),
                     });
+                } else {
+                    let lhs = AstNode::Identifier {
+                        ident: ident.to_string(),
+                    };
+                    return handle_operators(tokens, lhs);
                 }
             }
             _ => todo!("Case not handled: {:?}", token),
@@ -232,6 +237,55 @@ fn parse_expression(tokens: &mut Cursor<Token>) -> AstResult<AstNode> {
 mod test {
     use crate::ast;
     use crate::Lexer;
+
+    #[test]
+    fn test_long_program() {
+        let input = r#"let x = 10;
+            let y = 20;
+            let z = x + y;
+            let a = x - y;
+        "#;
+
+        let lexer = Lexer::from(input.to_string());
+        let tokens = lexer.collect::<Vec<_>>();
+        let ast = ast::parse(tokens);
+        let expected = vec![
+            ast::AstNode::Assignment {
+                ident: String::from("x"),
+                expression: Box::new(ast::AstNode::Number(10)),
+            },
+            ast::AstNode::Assignment {
+                ident: String::from("y"),
+                expression: Box::new(ast::AstNode::Number(20)),
+            },
+            ast::AstNode::Assignment {
+                ident: String::from("z"),
+                expression: Box::new(ast::AstNode::Arithmetic {
+                    lhs: Box::new(ast::AstNode::Identifier {
+                        ident: String::from("x"),
+                    }),
+                    rhs: Box::new(ast::AstNode::Identifier {
+                        ident: String::from("y"),
+                    }),
+                    arithmetic_type: ast::ArithmeticType::Addition,
+                }),
+            },
+            ast::AstNode::Assignment {
+                ident: String::from("a"),
+                expression: Box::new(ast::AstNode::Arithmetic {
+                    lhs: Box::new(ast::AstNode::Identifier {
+                        ident: String::from("x"),
+                    }),
+                    rhs: Box::new(ast::AstNode::Identifier {
+                        ident: String::from("y"),
+                    }),
+                    arithmetic_type: ast::ArithmeticType::Subtraction,
+                }),
+            },
+        ];
+
+        assert_eq!(ast, Ok(expected));
+    }
 
     #[test]
     fn test_let_statement() {
