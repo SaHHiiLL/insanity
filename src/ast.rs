@@ -98,6 +98,82 @@ fn parse_let(tokens: &mut Cursor<Token>) -> AstResult<AstNode> {
     }
 }
 
+fn handle_operators(tokens: &mut Cursor<Token>, lhs: AstNode) -> AstResult<AstNode> {
+    if tokens
+        .next_if(|t| *t.token_type() == TokenType::SemiColon)
+        .is_some()
+    {
+        return Ok(lhs);
+    }
+
+    if tokens
+        .next_if(|t| *t.token_type() == TokenType::Add)
+        .is_some()
+    {
+        let rhs = parse_expression(tokens)?;
+        Ok(AstNode::Arithmetic {
+            lhs: Box::new(lhs),
+            rhs: Box::new(rhs),
+            arithmetic_type: ArithmeticType::Addition,
+        })
+    } else if tokens
+        .next_if(|t| *t.token_type() == TokenType::Minus)
+        .is_some()
+    {
+        let rhs = parse_expression(tokens)?;
+        return Ok(AstNode::Arithmetic {
+            lhs: Box::new(lhs),
+            rhs: Box::new(rhs),
+            arithmetic_type: ArithmeticType::Subtraction,
+        });
+    } else if tokens
+        .next_if(|t| *t.token_type() == TokenType::Multiply)
+        .is_some()
+    {
+        let rhs = parse_expression(tokens)?;
+        return Ok(AstNode::Arithmetic {
+            lhs: Box::new(lhs),
+            rhs: Box::new(rhs),
+            arithmetic_type: ArithmeticType::Multiplication,
+        });
+    } else if tokens
+        .next_if(|t| *t.token_type() == TokenType::Divide)
+        .is_some()
+    {
+        let rhs = parse_expression(tokens)?;
+        return Ok(AstNode::Arithmetic {
+            lhs: Box::new(lhs),
+            rhs: Box::new(rhs),
+            arithmetic_type: ArithmeticType::Division,
+        });
+    } else if tokens
+        .next_if(|t| *t.token_type() == TokenType::Equals)
+        .is_some()
+    {
+        let rhs = parse_expression(tokens)?;
+        return Ok(AstNode::Logical {
+            lhs: Box::new(lhs),
+            rhs: Box::new(rhs),
+            logical_type: LogicalType::Equals,
+        });
+    } else if tokens
+        .next_if(|t| *t.token_type() == TokenType::NotEquals)
+        .is_some()
+    {
+        let rhs = parse_expression(tokens)?;
+        return Ok(AstNode::Logical {
+            lhs: Box::new(lhs),
+            rhs: Box::new(rhs),
+            logical_type: LogicalType::NotEquals,
+        });
+    } else {
+        panic!(
+            "Expected operator after expression got {:?}",
+            tokens.peek_ahead()
+        );
+    }
+}
+
 fn parse_expression(tokens: &mut Cursor<Token>) -> AstResult<AstNode> {
     while let Some(token) = tokens.next_if(|t| *t.token_type() != TokenType::SemiColon) {
         match token.token_type() {
@@ -108,50 +184,8 @@ fn parse_expression(tokens: &mut Cursor<Token>) -> AstResult<AstNode> {
                 {
                     return Ok(AstNode::Number(*num));
                 } else {
-                    // We have something else to parse such as a binary expression or arithmetic
-                    match tokens.next() {
-                        Some(next_token) => match next_token.token_type() {
-                            TokenType::Add => {
-                                let rhs = parse_expression(tokens)?;
-                                return Ok(AstNode::Arithmetic {
-                                    lhs: Box::new(AstNode::Number(*num)),
-                                    rhs: Box::new(rhs),
-                                    arithmetic_type: ArithmeticType::Addition,
-                                });
-                            }
-                            TokenType::Minus => {
-                                let rhs = parse_expression(tokens)?;
-                                return Ok(AstNode::Arithmetic {
-                                    lhs: Box::new(AstNode::Number(*num)),
-                                    rhs: Box::new(rhs),
-                                    arithmetic_type: ArithmeticType::Subtraction,
-                                });
-                            }
-                            TokenType::Multiply => {
-                                let rhs = parse_expression(tokens)?;
-                                return Ok(AstNode::Arithmetic {
-                                    lhs: Box::new(AstNode::Number(*num)),
-                                    rhs: Box::new(rhs),
-                                    arithmetic_type: ArithmeticType::Multiplication,
-                                });
-                            }
-                            TokenType::Divide => {
-                                let rhs = parse_expression(tokens)?;
-                                return Ok(AstNode::Arithmetic {
-                                    lhs: Box::new(AstNode::Number(*num)),
-                                    rhs: Box::new(rhs),
-                                    arithmetic_type: ArithmeticType::Division,
-                                });
-                            }
-
-                            _ => {
-                                todo!("Case not handled: {:?}", next_token.token_type())
-                            }
-                        },
-                        None => {
-                            return Err(ParserError::ExpectedTokenGotNone(TokenType::SemiColon))
-                        }
-                    }
+                    let lhs = AstNode::Number(*num);
+                    return handle_operators(tokens, lhs);
                 }
             }
             TokenType::StringLiteral(string) => {
@@ -167,10 +201,7 @@ fn parse_expression(tokens: &mut Cursor<Token>) -> AstResult<AstNode> {
                     let rhs = parse_expression(tokens)?;
                     match rhs {
                         AstNode::StringLiteral(rhs_string) => {
-                            return Ok(AstNode::StringLiteral(format!(
-                                "{}{}",
-                                string, rhs_string
-                            )));
+                            return Ok(AstNode::StringLiteral(format!("{}{}", string, rhs_string)));
                         }
                         _ => {
                             panic!("Expected string literal after +")
@@ -182,9 +213,14 @@ fn parse_expression(tokens: &mut Cursor<Token>) -> AstResult<AstNode> {
                 }
             }
             TokenType::Identifier(ident) => {
-                return Ok(AstNode::Identifier {
-                    ident: ident.clone(),
-                });
+                if tokens
+                    .next_if(|t| *t.token_type() == TokenType::SemiColon)
+                    .is_some()
+                {
+                    return Ok(AstNode::Identifier {
+                        ident: ident.to_string(),
+                    });
+                }
             }
             _ => todo!("Case not handled: {:?}", token),
         }

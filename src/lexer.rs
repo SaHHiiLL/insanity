@@ -54,6 +54,7 @@ impl std::fmt::Display for TokenType {
             TokenType::LessThan => "LessThan",
             TokenType::GreaterOrEqualThan => "GreaterOrEqualThan",
             TokenType::GreaterThan => "GreaterThan",
+            TokenType::Equals => "Equals",
             TokenType::InValid(error) => &format!("InValid({})", error),
         };
         write!(f, "{}", x)
@@ -105,6 +106,8 @@ pub enum TokenType {
     Comma,
     SemiColon,
     Assign,
+
+    Equals,
     NotEquals,
     Minus,
     Add,
@@ -139,10 +142,6 @@ impl Lexer {
     fn skip_spaces(&mut self) {
         while let Some(x) = self.input.get() {
             if x.is_whitespace() {
-                if *x == '\n' {
-                    self.curr_line += 1;
-                    self.curr_char = 1;
-                }
                 self.read_next();
             } else {
                 break;
@@ -277,7 +276,18 @@ impl Iterator for Lexer {
             '(' => Some(TokenType::LeftParen),
             '}' => Some(TokenType::RightBrace),
             '{' => Some(TokenType::LeftBrace),
-            '=' => Some(TokenType::Assign),
+            '=' => {
+                if let Some(peak) = self.input.peek_ahead() {
+                    if *peak == '=' {
+                        self.read_next();
+                        Some(TokenType::Equals)
+                    } else {
+                        Some(TokenType::Assign)
+                    }
+                } else {
+                    Some(TokenType::Assign)
+                }
+            }
             '<' => {
                 if let Some(peak) = self.input.peek_ahead() {
                     if *peak == '=' {
@@ -497,8 +507,7 @@ mod tests {
             TokenType::Identifier("Hey".to_string()),
             TokenType::Identifier("world".to_string()),
             TokenType::NotEquals,
-            TokenType::Assign,
-            TokenType::Assign,
+            TokenType::Equals,
             TokenType::LeftParen,
             TokenType::RightParen,
         ];
