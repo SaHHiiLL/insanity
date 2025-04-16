@@ -14,6 +14,23 @@ pub(crate) enum ArithmeticType {
     Division,
 }
 
+impl ArithmeticType {
+    fn weighted(&self) -> i64 {
+        match self {
+            ArithmeticType::Addition => 1,
+            ArithmeticType::Subtraction => 1,
+            ArithmeticType::Multiplication => 2,
+            ArithmeticType::Division => 2,
+        }
+    }
+}
+
+impl PartialOrd for ArithmeticType {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.weighted().cmp(&other.weighted()))
+    }
+}
+
 #[derive(Debug, PartialEq)]
 pub(crate) enum LogicalType {
     Equals,
@@ -179,7 +196,10 @@ fn parse_expression(tokens: &mut Cursor<Token>) -> AstResult<AstNode> {
         match token.token_type() {
             TokenType::Number(num) => {
                 if tokens
-                    .next_if(|t| *t.token_type() == TokenType::SemiColon)
+                    .next_if(|t| {
+                        (*t.token_type() == TokenType::SemiColon)
+                            || (*t.token_type() == TokenType::Comma)
+                    })
                     .is_some()
                 {
                     return Ok(AstNode::Number(*num));
@@ -378,6 +398,29 @@ mod test {
                     arithmetic_type: ast::ArithmeticType::Addition,
                 }),
                 arithmetic_type: ast::ArithmeticType::Division,
+            }),
+        }];
+        assert_eq!(program, expected);
+    }
+
+    #[test]
+    fn test_arithmetic_precedence() {
+        let input = String::from("let x = 10 * 20 + 30;");
+        let lexer = Lexer::from(input);
+        let tokens = lexer.collect::<Vec<_>>();
+        let program = dbg!(ast::parse(tokens));
+        assert!(program.is_ok());
+        let program = program.unwrap();
+        let expected = vec![ast::AstNode::Assignment {
+            ident: String::from("x"),
+            expression: Box::new(ast::AstNode::Arithmetic {
+                lhs: Box::new(ast::AstNode::Arithmetic {
+                    lhs: Box::new(ast::AstNode::Number(10)),
+                    rhs: Box::new(ast::AstNode::Number(20)),
+                    arithmetic_type: ast::ArithmeticType::Multiplication,
+                }),
+                rhs: Box::new(ast::AstNode::Number(30)),
+                arithmetic_type: ast::ArithmeticType::Addition,
             }),
         }];
         assert_eq!(program, expected);
