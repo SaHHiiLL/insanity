@@ -75,7 +75,7 @@ impl Token {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum TokenType {
     Identifier(String),
     Number(i64),

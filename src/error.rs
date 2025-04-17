@@ -60,7 +60,7 @@ impl std::fmt::Display for LexerError {
 
 #[derive(Error, Clone, Debug, Eq, PartialEq)]
 pub enum ParserError {
-    ExpectedExpression(String),
+    ExpectedExpression(&'static str),
     InvalidExpression(Token),
     InvalidIdentifier(Token),
     ExpectedTokenGotNone(TokenType),

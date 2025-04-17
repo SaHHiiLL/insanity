@@ -3,6 +3,8 @@ use crate::{
     lexer::{Token, TokenType},
     peeker::Cursor,
 };
+use lazy_static::lazy_static;
+use std::collections::HashMap;
 
 type BAstNode = Box<AstNode>;
 
@@ -17,10 +19,8 @@ pub(crate) enum ArithmeticType {
 impl ArithmeticType {
     fn weighted(&self) -> i64 {
         match self {
-            ArithmeticType::Addition => 1,
-            ArithmeticType::Subtraction => 1,
-            ArithmeticType::Multiplication => 2,
-            ArithmeticType::Division => 2,
+            ArithmeticType::Addition | ArithmeticType::Subtraction => 1,
+            ArithmeticType::Multiplication | ArithmeticType::Division => 2,
         }
     }
 }
@@ -115,6 +115,17 @@ fn parse_let(tokens: &mut Cursor<Token>) -> AstResult<AstNode> {
     }
 }
 
+lazy_static! {
+    static ref PRECEDENCE: HashMap<TokenType, usize> = {
+        let mut m = HashMap::new();
+        m.insert(TokenType::Add, 1);
+        m.insert(TokenType::Minus, 1);
+        m.insert(TokenType::Multiply, 2);
+        m.insert(TokenType::Divide, 2);
+        m
+    };
+}
+
 fn handle_operators(tokens: &mut Cursor<Token>, lhs: AstNode) -> AstResult<AstNode> {
     if tokens
         .next_if(|t| *t.token_type() == TokenType::SemiColon)
@@ -189,6 +200,40 @@ fn handle_operators(tokens: &mut Cursor<Token>, lhs: AstNode) -> AstResult<AstNo
             tokens.peek_ahead()
         );
     }
+}
+
+#[allow(dead_code)]
+#[allow(unused_variables)]
+#[allow(clippy::unnecessary_lazy_evaluations)]
+fn opetator_climb(tokens: &mut Cursor<Token>, lhs: AstNode, min_pre: usize) -> AstResult<AstNode> {
+    let lookahead = tokens
+        .peek_ahead()
+        .ok_or_else(|| ParserError::ExpectedExpression("expected expreesion got NONE"))?;
+
+    match lookahead.token_type() {
+        TokenType::Add | TokenType::Minus => {
+            let lookahead_pre = PRECEDENCE
+                .get(lookahead.token_type())
+                .map(|p| *p > min_pre)
+                .unwrap_or(false);
+
+            while lookahead_pre {
+                // can safely unwrap here
+                let op = tokens.next().unwrap();
+                let rhs = parse_expression(tokens)?;
+
+                let lookahead = tokens.peek_ahead().ok_or_else(|| {
+                    ParserError::ExpectedExpression("expected expreesion got NONE")
+                })?;
+            }
+        }
+        TokenType::Divide | TokenType::Multiply => {}
+        _ => {
+            panic!("Invalid operator: {:?}", lookahead);
+        }
+    }
+
+    todo!()
 }
 
 fn parse_expression(tokens: &mut Cursor<Token>) -> AstResult<AstNode> {
