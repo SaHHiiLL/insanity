@@ -2,7 +2,7 @@ use thiserror::Error;
 
 use crate::lexer::{Token, TokenType};
 
-#[derive(Error, Debug, Clone, Eq, PartialEq)]
+#[derive(Error, Debug, Clone, Eq, PartialEq, Hash)]
 pub struct LexerError {
     start_position: usize,
     line_number: usize,
@@ -60,7 +60,7 @@ impl std::fmt::Display for LexerError {
 
 #[derive(Error, Clone, Debug, Eq, PartialEq)]
 pub enum ParserError {
-    ExpectedExpression(String),
+    ExpectedExpression(&'static str),
     InvalidExpression(Token),
     InvalidIdentifier(Token),
     ExpectedTokenGotNone(TokenType),

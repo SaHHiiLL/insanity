@@ -3,6 +3,7 @@ use crate::{
     lexer::{Token, TokenType},
     peeker::Cursor,
 };
+use std::ops::Add;
 
 type BAstNode = Box<AstNode>;
 
@@ -17,10 +18,8 @@ pub(crate) enum ArithmeticType {
 impl ArithmeticType {
     fn weighted(&self) -> i64 {
         match self {
-            ArithmeticType::Addition => 1,
-            ArithmeticType::Subtraction => 1,
-            ArithmeticType::Multiplication => 2,
-            ArithmeticType::Division => 2,
+            ArithmeticType::Addition | ArithmeticType::Subtraction => 1,
+            ArithmeticType::Multiplication | ArithmeticType::Division => 2,
         }
     }
 }
@@ -95,6 +94,31 @@ pub(crate) fn parse(tokens: Vec<Token>) -> Result<Vec<AstNode>, Vec<ParserError>
     Ok(ast)
 }
 
+fn parse_primary(tokens: &mut Cursor<Token>) -> AstResult<AstNode> {
+    if let Some(token) = tokens.next() {
+        match token.token_type() {
+            TokenType::Number(num) => Ok(AstNode::Number(*num)),
+            TokenType::StringLiteral(string) => Ok(AstNode::StringLiteral(string.clone())),
+            TokenType::Identifier(ident) => Ok(AstNode::Identifier {
+                ident: ident.to_string(),
+            }),
+            TokenType::LeftParen => {
+                let expression = parse_expression(tokens)?;
+                if tokens
+                    .next_if(|t| *t.token_type() == TokenType::RightParen)
+                    .is_some()
+                {
+                    Ok(expression)
+                } else {
+                    panic!("Expected closing paren");
+                }
+            }
+            _ => panic!("Unexpected token: {:?}", token),
+        }
+    } else {
+        panic!("Expected token");
+    }
+}
 fn parse_let(tokens: &mut Cursor<Token>) -> AstResult<AstNode> {
     if let Some(ident) = tokens.next_if(|t| matches!(t.token_type(), TokenType::Identifier(_))) {
         if tokens
@@ -115,6 +139,150 @@ fn parse_let(tokens: &mut Cursor<Token>) -> AstResult<AstNode> {
     }
 }
 
+#[derive(Debug, PartialEq, PartialOrd)]
+enum Precedence {
+    Zero = 0,
+    Low,
+    High,
+    Max,
+}
+
+impl Add for Precedence {
+    type Output = Precedence;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        if self == Precedence::Max || rhs == Precedence::Max {
+            return Precedence::Max;
+        }
+        if self == Precedence::Zero {
+            return rhs;
+        }
+        if rhs == Precedence::Zero {
+            return self;
+        }
+        if self == Precedence::Low && rhs == Precedence::High {
+            return Precedence::High;
+        }
+        if self == Precedence::High && rhs == Precedence::Low {
+            return Precedence::High;
+        }
+        if self == Precedence::Low && rhs == Precedence::Low {
+            return Precedence::Low;
+        }
+        if self == Precedence::High && rhs == Precedence::High {
+            return Precedence::High;
+        }
+        if self == Precedence::Low && rhs == Precedence::Max {
+            return Precedence::Max;
+        }
+        if self == Precedence::Max && rhs == Precedence::Low {
+            return Precedence::Max;
+        }
+        if self == Precedence::High && rhs == Precedence::Max {
+            return Precedence::Max;
+        }
+        if self == Precedence::Max && rhs == Precedence::High {
+            return Precedence::Max;
+        }
+        panic!("Invalid precedence: {:?} + {:?}", self, rhs);
+    }
+}
+
+impl From<usize> for Precedence {
+    fn from(value: usize) -> Self {
+        match value {
+            0 => Precedence::Zero,
+            1 => Precedence::Low,
+            2 => Precedence::High,
+            _ => Precedence::Max,
+        }
+    }
+}
+
+fn parse_expression1(
+    tokens: &mut Cursor<Token>,
+    mut lhs: AstNode,
+    min_precedence: Precedence,
+) -> AstResult<AstNode> {
+    let mut lookahead = {
+        tokens
+            .next_if(|t| token_precedence(t.token_type()).is_some())
+            .ok_or(ParserError::ExpectedExpression(
+                "expected expression got NONE",
+            ))?
+    };
+
+    while let Some(precedence) = token_precedence(lookahead.token_type()) {
+        if precedence < min_precedence {
+            break;
+        }
+
+        let operator = lookahead;
+        let op_pre = token_precedence(operator.token_type())
+            .expect("operator should always be an operator because of the fist while loop");
+
+        let mut rhs = { parse_primary(tokens) }?;
+        lookahead = tokens.next().unwrap();
+
+        while let Some(precedence) = token_precedence(lookahead.token_type()) {
+            if precedence < op_pre {
+                break;
+            }
+
+            let rhs_pre = precedence
+                + Precedence::from({
+                    if let Some(pre) = token_precedence(lookahead.token_type()) {
+                        if pre > op_pre {
+                            1
+                        } else {
+                            0
+                        }
+                    } else {
+                        0
+                    }
+                });
+            rhs = parse_expression1(tokens, rhs, rhs_pre).unwrap();
+            lookahead = tokens.next().unwrap();
+        }
+
+        lhs = match operator.token_type() {
+            TokenType::Add => AstNode::Arithmetic {
+                lhs: Box::new(lhs),
+                rhs: Box::new(rhs),
+                arithmetic_type: ArithmeticType::Addition,
+            },
+            TokenType::Minus => AstNode::Arithmetic {
+                lhs: Box::new(lhs),
+                rhs: Box::new(rhs),
+                arithmetic_type: ArithmeticType::Subtraction,
+            },
+            TokenType::Multiply => AstNode::Arithmetic {
+                lhs: Box::new(lhs),
+                rhs: Box::new(rhs),
+                arithmetic_type: ArithmeticType::Multiplication,
+            },
+            TokenType::Divide => AstNode::Arithmetic {
+                lhs: Box::new(lhs),
+                rhs: Box::new(rhs),
+                arithmetic_type: ArithmeticType::Division,
+            },
+            _ => panic!("Invalid operator"),
+        };
+    }
+
+    Ok(lhs)
+}
+
+/// returns a Some(_) varient if token type is a binary operator
+fn token_precedence(token: &TokenType) -> Option<Precedence> {
+    match token {
+        TokenType::Add | TokenType::Minus => Some(Precedence::Low),
+        TokenType::Divide | TokenType::Multiply => Some(Precedence::High),
+        _ => None,
+    }
+}
+
+#[deprecated]
 fn handle_operators(tokens: &mut Cursor<Token>, lhs: AstNode) -> AstResult<AstNode> {
     if tokens
         .next_if(|t| *t.token_type() == TokenType::SemiColon)
@@ -205,7 +373,7 @@ fn parse_expression(tokens: &mut Cursor<Token>) -> AstResult<AstNode> {
                     return Ok(AstNode::Number(*num));
                 } else {
                     let lhs = AstNode::Number(*num);
-                    return handle_operators(tokens, lhs);
+                    return parse_expression1(tokens, lhs, Precedence::Zero);
                 }
             }
             TokenType::StringLiteral(string) => {
@@ -388,7 +556,7 @@ mod test {
         let program = dbg!(ast::parse(tokens));
         assert!(program.is_ok());
         let program = program.unwrap();
-        let expected = vec![ast::AstNode::Assignment {
+        let unexpected = vec![ast::AstNode::Assignment {
             ident: String::from("x"),
             expression: Box::new(ast::AstNode::Arithmetic {
                 lhs: Box::new(ast::AstNode::Number(10)),
@@ -398,6 +566,19 @@ mod test {
                     arithmetic_type: ast::ArithmeticType::Addition,
                 }),
                 arithmetic_type: ast::ArithmeticType::Division,
+            }),
+        }];
+        assert_ne!(program, unexpected);
+        let expected = vec![ast::AstNode::Assignment {
+            ident: String::from("x"),
+            expression: Box::new(ast::AstNode::Arithmetic {
+                lhs: Box::new(ast::AstNode::Arithmetic {
+                    lhs: Box::new(ast::AstNode::Number(10)),
+                    rhs: Box::new(ast::AstNode::Number(20)),
+                    arithmetic_type: ast::ArithmeticType::Division,
+                }),
+                rhs: Box::new(ast::AstNode::Number(30)),
+                arithmetic_type: ast::ArithmeticType::Addition,
             }),
         }];
         assert_eq!(program, expected);
