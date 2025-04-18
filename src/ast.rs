@@ -204,25 +204,23 @@ fn parse_expression1(
     mut lhs: AstNode,
     min_precedence: Precedence,
 ) -> AstResult<AstNode> {
-    let mut lookahead = {
-        tokens
-            .next_if(|t| token_precedence(t.token_type()).is_some())
-            .ok_or(ParserError::ExpectedExpression(
-                "expected expression got NONE",
-            ))?
-    };
+    let lookahead = { tokens.next_if(|t| token_precedence(t.token_type()).is_some()) };
+    if lookahead.is_none() {
+        return Ok(lhs);
+    }
+    let mut lookahead = lookahead.unwrap();
 
     while let Some(precedence) = token_precedence(lookahead.token_type()) {
+        let mut break_off = false;
         if precedence < min_precedence {
             break;
         }
 
-        let operator = lookahead;
+        let operator = lookahead.clone();
         let op_pre = token_precedence(operator.token_type())
             .expect("operator should always be an operator because of the fist while loop");
 
         let mut rhs = { parse_primary(tokens) }?;
-        lookahead = tokens.next().unwrap();
 
         while let Some(precedence) = token_precedence(lookahead.token_type()) {
             if precedence < op_pre {
@@ -241,8 +239,14 @@ fn parse_expression1(
                         0
                     }
                 });
-            rhs = parse_expression1(tokens, rhs, rhs_pre).unwrap();
-            lookahead = tokens.next().unwrap();
+            rhs = parse_expression1(tokens, rhs, rhs_pre)?;
+            match tokens.next() {
+                Some(l) => lookahead = l,
+                None => {
+                    break_off = true;
+                    break
+                },
+            }
         }
 
         lhs = match operator.token_type() {
@@ -268,6 +272,10 @@ fn parse_expression1(
             },
             _ => panic!("Invalid operator"),
         };
+        
+        if break_off {
+            break;
+        }
     }
 
     Ok(lhs)
@@ -605,5 +613,14 @@ mod test {
             }),
         }];
         assert_eq!(program, expected);
+    }
+
+    #[test]
+    fn test_long_arithmetic_precedence() {
+        let input = String::from("let x = 10 + 20 * 30;");
+        let lexer = Lexer::from(input);
+        let tokens = lexer.collect::<Vec<_>>();
+        let program = ast::parse(tokens);
+        eprintln!("Program: {:?}", program);
     }
 }
