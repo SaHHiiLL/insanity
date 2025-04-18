@@ -3,8 +3,7 @@ use crate::{
     lexer::{Token, TokenType},
     peeker::Cursor,
 };
-use lazy_static::lazy_static;
-use std::{collections::HashMap, ops::Add};
+use std::ops::Add;
 
 type BAstNode = Box<AstNode>;
 
@@ -109,7 +108,7 @@ fn parse_primary(tokens: &mut Cursor<Token>) -> AstResult<AstNode> {
                     .next_if(|t| *t.token_type() == TokenType::RightParen)
                     .is_some()
                 {
-                    return Ok(expression);
+                    Ok(expression)
                 } else {
                     panic!("Expected closing paren");
                 }
@@ -208,11 +207,13 @@ fn parse_expression1(
     let mut lookahead = {
         tokens
             .next_if(|t| token_precedence(t.token_type()).is_some())
-            .ok_or_else(|| ParserError::ExpectedExpression("expected expression got NONE"))?
+            .ok_or(ParserError::ExpectedExpression(
+                "expected expression got NONE",
+            ))?
     };
 
     while let Some(precedence) = token_precedence(lookahead.token_type()) {
-        if !(precedence >= min_precedence) {
+        if precedence < min_precedence {
             break;
         }
 
@@ -224,7 +225,7 @@ fn parse_expression1(
         lookahead = tokens.next().unwrap();
 
         while let Some(precedence) = token_precedence(lookahead.token_type()) {
-            if !(precedence >= op_pre) {
+            if precedence < op_pre {
                 break;
             }
 
@@ -372,7 +373,7 @@ fn parse_expression(tokens: &mut Cursor<Token>) -> AstResult<AstNode> {
                     return Ok(AstNode::Number(*num));
                 } else {
                     let lhs = AstNode::Number(*num);
-                    return handle_operators(tokens, lhs);
+                    return parse_expression1(tokens, lhs, Precedence::Zero);
                 }
             }
             TokenType::StringLiteral(string) => {
@@ -555,7 +556,7 @@ mod test {
         let program = dbg!(ast::parse(tokens));
         assert!(program.is_ok());
         let program = program.unwrap();
-        let expected = vec![ast::AstNode::Assignment {
+        let unexpected = vec![ast::AstNode::Assignment {
             ident: String::from("x"),
             expression: Box::new(ast::AstNode::Arithmetic {
                 lhs: Box::new(ast::AstNode::Number(10)),
@@ -565,6 +566,19 @@ mod test {
                     arithmetic_type: ast::ArithmeticType::Addition,
                 }),
                 arithmetic_type: ast::ArithmeticType::Division,
+            }),
+        }];
+        assert_ne!(program, unexpected);
+        let expected = vec![ast::AstNode::Assignment {
+            ident: String::from("x"),
+            expression: Box::new(ast::AstNode::Arithmetic {
+                lhs: Box::new(ast::AstNode::Arithmetic {
+                    lhs: Box::new(ast::AstNode::Number(10)),
+                    rhs: Box::new(ast::AstNode::Number(20)),
+                    arithmetic_type: ast::ArithmeticType::Division,
+                }),
+                rhs: Box::new(ast::AstNode::Number(30)),
+                arithmetic_type: ast::ArithmeticType::Addition,
             }),
         }];
         assert_eq!(program, expected);
