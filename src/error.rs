@@ -2,7 +2,7 @@ use thiserror::Error;
 
 use crate::lexer::{Token, TokenType};
 
-#[derive(Error, Debug, Clone, Eq, PartialEq)]
+#[derive(Error, Debug, Clone, Eq, PartialEq, Hash)]
 pub struct LexerError {
     start_position: usize,
     line_number: usize,

@@ -4,7 +4,7 @@ use crate::{
     peeker::Cursor,
 };
 use lazy_static::lazy_static;
-use std::collections::HashMap;
+use std::{collections::HashMap, ops::Add};
 
 type BAstNode = Box<AstNode>;
 
@@ -95,6 +95,31 @@ pub(crate) fn parse(tokens: Vec<Token>) -> Result<Vec<AstNode>, Vec<ParserError>
     Ok(ast)
 }
 
+fn parse_primary(tokens: &mut Cursor<Token>) -> AstResult<AstNode> {
+    if let Some(token) = tokens.next() {
+        match token.token_type() {
+            TokenType::Number(num) => Ok(AstNode::Number(*num)),
+            TokenType::StringLiteral(string) => Ok(AstNode::StringLiteral(string.clone())),
+            TokenType::Identifier(ident) => Ok(AstNode::Identifier {
+                ident: ident.to_string(),
+            }),
+            TokenType::LeftParen => {
+                let expression = parse_expression(tokens)?;
+                if tokens
+                    .next_if(|t| *t.token_type() == TokenType::RightParen)
+                    .is_some()
+                {
+                    return Ok(expression);
+                } else {
+                    panic!("Expected closing paren");
+                }
+            }
+            _ => panic!("Unexpected token: {:?}", token),
+        }
+    } else {
+        panic!("Expected token");
+    }
+}
 fn parse_let(tokens: &mut Cursor<Token>) -> AstResult<AstNode> {
     if let Some(ident) = tokens.next_if(|t| matches!(t.token_type(), TokenType::Identifier(_))) {
         if tokens
@@ -115,17 +140,148 @@ fn parse_let(tokens: &mut Cursor<Token>) -> AstResult<AstNode> {
     }
 }
 
-lazy_static! {
-    static ref PRECEDENCE: HashMap<TokenType, usize> = {
-        let mut m = HashMap::new();
-        m.insert(TokenType::Add, 1);
-        m.insert(TokenType::Minus, 1);
-        m.insert(TokenType::Multiply, 2);
-        m.insert(TokenType::Divide, 2);
-        m
-    };
+#[derive(Debug, PartialEq, PartialOrd)]
+enum Precedence {
+    Zero = 0,
+    Low,
+    High,
+    Max,
 }
 
+impl Add for Precedence {
+    type Output = Precedence;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        if self == Precedence::Max || rhs == Precedence::Max {
+            return Precedence::Max;
+        }
+        if self == Precedence::Zero {
+            return rhs;
+        }
+        if rhs == Precedence::Zero {
+            return self;
+        }
+        if self == Precedence::Low && rhs == Precedence::High {
+            return Precedence::High;
+        }
+        if self == Precedence::High && rhs == Precedence::Low {
+            return Precedence::High;
+        }
+        if self == Precedence::Low && rhs == Precedence::Low {
+            return Precedence::Low;
+        }
+        if self == Precedence::High && rhs == Precedence::High {
+            return Precedence::High;
+        }
+        if self == Precedence::Low && rhs == Precedence::Max {
+            return Precedence::Max;
+        }
+        if self == Precedence::Max && rhs == Precedence::Low {
+            return Precedence::Max;
+        }
+        if self == Precedence::High && rhs == Precedence::Max {
+            return Precedence::Max;
+        }
+        if self == Precedence::Max && rhs == Precedence::High {
+            return Precedence::Max;
+        }
+        panic!("Invalid precedence: {:?} + {:?}", self, rhs);
+    }
+}
+
+impl From<usize> for Precedence {
+    fn from(value: usize) -> Self {
+        match value {
+            0 => Precedence::Zero,
+            1 => Precedence::Low,
+            2 => Precedence::High,
+            _ => Precedence::Max,
+        }
+    }
+}
+
+fn parse_expression1(
+    tokens: &mut Cursor<Token>,
+    mut lhs: AstNode,
+    min_precedence: Precedence,
+) -> AstResult<AstNode> {
+    let mut lookahead = {
+        tokens
+            .next_if(|t| token_precedence(t.token_type()).is_some())
+            .ok_or_else(|| ParserError::ExpectedExpression("expected expression got NONE"))?
+    };
+
+    while let Some(precedence) = token_precedence(lookahead.token_type()) {
+        if !(precedence >= min_precedence) {
+            break;
+        }
+
+        let operator = lookahead;
+        let op_pre = token_precedence(operator.token_type())
+            .expect("operator should always be an operator because of the fist while loop");
+
+        let mut rhs = { parse_primary(tokens) }?;
+        lookahead = tokens.next().unwrap();
+
+        while let Some(precedence) = token_precedence(lookahead.token_type()) {
+            if !(precedence >= op_pre) {
+                break;
+            }
+
+            let rhs_pre = precedence
+                + Precedence::from({
+                    if let Some(pre) = token_precedence(lookahead.token_type()) {
+                        if pre > op_pre {
+                            1
+                        } else {
+                            0
+                        }
+                    } else {
+                        0
+                    }
+                });
+            rhs = parse_expression1(tokens, rhs, rhs_pre).unwrap();
+            lookahead = tokens.next().unwrap();
+        }
+
+        lhs = match operator.token_type() {
+            TokenType::Add => AstNode::Arithmetic {
+                lhs: Box::new(lhs),
+                rhs: Box::new(rhs),
+                arithmetic_type: ArithmeticType::Addition,
+            },
+            TokenType::Minus => AstNode::Arithmetic {
+                lhs: Box::new(lhs),
+                rhs: Box::new(rhs),
+                arithmetic_type: ArithmeticType::Subtraction,
+            },
+            TokenType::Multiply => AstNode::Arithmetic {
+                lhs: Box::new(lhs),
+                rhs: Box::new(rhs),
+                arithmetic_type: ArithmeticType::Multiplication,
+            },
+            TokenType::Divide => AstNode::Arithmetic {
+                lhs: Box::new(lhs),
+                rhs: Box::new(rhs),
+                arithmetic_type: ArithmeticType::Division,
+            },
+            _ => panic!("Invalid operator"),
+        };
+    }
+
+    Ok(lhs)
+}
+
+/// returns a Some(_) varient if token type is a binary operator
+fn token_precedence(token: &TokenType) -> Option<Precedence> {
+    match token {
+        TokenType::Add | TokenType::Minus => Some(Precedence::Low),
+        TokenType::Divide | TokenType::Multiply => Some(Precedence::High),
+        _ => None,
+    }
+}
+
+#[deprecated]
 fn handle_operators(tokens: &mut Cursor<Token>, lhs: AstNode) -> AstResult<AstNode> {
     if tokens
         .next_if(|t| *t.token_type() == TokenType::SemiColon)
@@ -200,40 +356,6 @@ fn handle_operators(tokens: &mut Cursor<Token>, lhs: AstNode) -> AstResult<AstNo
             tokens.peek_ahead()
         );
     }
-}
-
-#[allow(dead_code)]
-#[allow(unused_variables)]
-#[allow(clippy::unnecessary_lazy_evaluations)]
-fn opetator_climb(tokens: &mut Cursor<Token>, lhs: AstNode, min_pre: usize) -> AstResult<AstNode> {
-    let lookahead = tokens
-        .peek_ahead()
-        .ok_or_else(|| ParserError::ExpectedExpression("expected expreesion got NONE"))?;
-
-    match lookahead.token_type() {
-        TokenType::Add | TokenType::Minus => {
-            let lookahead_pre = PRECEDENCE
-                .get(lookahead.token_type())
-                .map(|p| *p > min_pre)
-                .unwrap_or(false);
-
-            while lookahead_pre {
-                // can safely unwrap here
-                let op = tokens.next().unwrap();
-                let rhs = parse_expression(tokens)?;
-
-                let lookahead = tokens.peek_ahead().ok_or_else(|| {
-                    ParserError::ExpectedExpression("expected expreesion got NONE")
-                })?;
-            }
-        }
-        TokenType::Divide | TokenType::Multiply => {}
-        _ => {
-            panic!("Invalid operator: {:?}", lookahead);
-        }
-    }
-
-    todo!()
 }
 
 fn parse_expression(tokens: &mut Cursor<Token>) -> AstResult<AstNode> {
