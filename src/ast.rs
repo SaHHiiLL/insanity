@@ -124,6 +124,12 @@ pub(crate) fn parse(tokens: Vec<Token>) -> Result<Vec<AstNode>, Vec<ParserError>
                     ast.push(AstNode::Return {
                         expression: Box::new(expression),
                     });
+                } else {
+                    panic!(
+                        "{}:{}: Expected expression after return at ",
+                        token.line_nbr(),
+                        token.char_nbr(),
+                    );
                 }
             }
             TokenType::Let => {
