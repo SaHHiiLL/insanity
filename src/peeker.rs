@@ -17,6 +17,10 @@ impl<T> Cursor<T> {
         self.items.get(self.idx + 1)
     }
 
+    pub(crate) fn peek_ahead_mut(&mut self) -> Option<&T> {
+        self.items.get(self.idx + 1)
+    }
+
     pub(crate) fn idx(&self) -> usize {
         self.idx
     }
