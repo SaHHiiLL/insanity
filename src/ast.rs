@@ -183,7 +183,6 @@ fn parse_expression1(
             }
 
             let precedence = token_precedence(token.token_type()).unwrap();
-            // assert!(tokens.next().unwrap().token_type().is_binary_op());
 
             if precedence > lhs_precedence {
                 rhs = parse_expression1(tokens, rhs, precedence)?;
