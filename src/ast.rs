@@ -107,7 +107,7 @@ pub(crate) enum AstNode {
     },
     Boolean(bool),
     Paren(BAstNode),
-    EmptyExpression,
+    FunctionCall(Vec<BAstNode>),
 }
 
 type AstResult = Result<AstNode, ParserError>;
@@ -118,6 +118,14 @@ pub(crate) fn parse(tokens: Vec<Token>) -> Result<Vec<AstNode>, Vec<ParserError>
 
     while let Some(token) = cursor.next() {
         match token.token_type() {
+            TokenType::Return => {
+                // Syntax: return <expression>;
+                if let Some(expression) = parse_expression(&mut cursor, Precedence::Low).ok() {
+                    ast.push(AstNode::Return {
+                        expression: Box::new(expression),
+                    });
+                }
+            }
             TokenType::Let => {
                 // Syntax: let <identifier> = <expression>;
                 if let Some(ident) =
@@ -226,9 +234,23 @@ fn parse_primary(tokens: &mut Cursor<Token>) -> AstResult {
     match x.token_type() {
         TokenType::Number(n) => Ok(AstNode::Number(*n)),
         TokenType::StringLiteral(s) => Ok(AstNode::StringLiteral(s.to_string())),
-        TokenType::Identifier(ident) => Ok(AstNode::Identifier {
-            ident: ident.to_string(),
-        }),
+        TokenType::Identifier(ident) => {
+            if tokens
+                .next_if(|t| *t.token_type() == TokenType::RightParen)
+                .is_some()
+            {
+                // Possible function invocation
+                // have to get all the values
+                todo!("Function Arguments")
+            } else {
+                Ok(AstNode::Identifier {
+                    ident: ident.to_string(),
+                })
+            }
+        }
+        // TokenType::Identifier(ident) => Ok(AstNode::Identifier {
+        //     ident: ident.to_string(),
+        // }),
         _ => panic!("Unexpected token: {:?}", x),
     }
 }
