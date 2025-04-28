@@ -122,6 +122,15 @@ pub enum TokenType {
     InValid(crate::error::LexerError),
 }
 
+impl TokenType {
+    pub fn is_binary_op(&self) -> bool {
+        matches!(
+            self,
+            TokenType::Add | TokenType::Minus | TokenType::Multiply | TokenType::Divide
+        )
+    }
+}
+
 #[derive(Debug)]
 pub struct Lexer {
     input: Cursor<char>,
