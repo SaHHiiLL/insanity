@@ -466,4 +466,26 @@ mod test {
         }];
         assert_eq!(program, Ok(expected));
     }
+
+    #[test]
+    fn test_same_precedence() {
+        let input = String::from("let x = 10 + 20 - 30;");
+
+        let lexer = Lexer::from(input);
+        let tokens = lexer.collect::<Vec<_>>();
+        let program = ast::parse(tokens);
+        let expected = vec![ast::AstNode::Assignment {
+            ident: String::from("x"),
+            expression: Box::new(ast::AstNode::Arithmetic {
+                lhs: Box::new(ast::AstNode::Arithmetic {
+                    lhs: Box::new(ast::AstNode::Number(10)),
+                    rhs: Box::new(ast::AstNode::Number(20)),
+                    arithmetic_type: ast::ArithmeticType::Addition,
+                }),
+                rhs: Box::new(ast::AstNode::Number(30)),
+                arithmetic_type: ast::ArithmeticType::Subtraction,
+            }),
+        }];
+        assert_eq!(program, Ok(expected));
+    }
 }
