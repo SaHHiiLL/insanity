@@ -39,8 +39,8 @@ impl Add for Precedence {
     }
 }
 
-impl From<i64> for Precedence {
-    fn from(value: i64) -> Self {
+impl From<u64> for Precedence {
+    fn from(value: u64) -> Self {
         match value {
             0 => Precedence::Low,
             1 => Precedence::Medium,
@@ -55,21 +55,6 @@ pub(crate) enum ArithmeticType {
     Subtraction,
     Multiplication,
     Division,
-}
-
-impl ArithmeticType {
-    fn weighted(&self) -> i64 {
-        match self {
-            ArithmeticType::Addition | ArithmeticType::Subtraction => 1,
-            ArithmeticType::Multiplication | ArithmeticType::Division => 2,
-        }
-    }
-}
-
-impl PartialOrd for ArithmeticType {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.weighted().cmp(&other.weighted()))
-    }
 }
 
 #[derive(Debug, PartialEq)]
@@ -99,7 +84,6 @@ pub(crate) enum AstNode {
         rhs: BAstNode,
         arithmetic_type: ArithmeticType,
     },
-
     Logical {
         lhs: BAstNode,
         rhs: BAstNode,
@@ -108,6 +92,11 @@ pub(crate) enum AstNode {
     Boolean(bool),
     Paren(BAstNode),
     FunctionCall(Vec<BAstNode>),
+    FunctionDefinition {
+        name: String,
+        args: Vec<String>,
+        body: BAstNode,
+    },
 }
 
 type AstResult = Result<AstNode, ParserError>;
@@ -126,11 +115,15 @@ pub(crate) fn parse(tokens: Vec<Token>) -> Result<Vec<AstNode>, Vec<ParserError>
                     });
                 } else {
                     panic!(
-                        "{}:{}: Expected expression after return at ",
+                        "{}:{}: Expected expression after `return` at ",
                         token.line_nbr(),
                         token.char_nbr(),
                     );
                 }
+            }
+            TokenType::Function => {
+                // Syntax: fn <ident>(args0..*) : <type> { <body> }
+                // TODO: Implement function parsing
             }
             TokenType::Let => {
                 // Syntax: let <identifier> = <expression>;
