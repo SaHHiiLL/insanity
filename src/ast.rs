@@ -39,8 +39,8 @@ impl Add for Precedence {
     }
 }
 
-impl From<i64> for Precedence {
-    fn from(value: i64) -> Self {
+impl From<u64> for Precedence {
+    fn from(value: u64) -> Self {
         match value {
             0 => Precedence::Low,
             1 => Precedence::Medium,
@@ -55,21 +55,6 @@ pub(crate) enum ArithmeticType {
     Subtraction,
     Multiplication,
     Division,
-}
-
-impl ArithmeticType {
-    fn weighted(&self) -> i64 {
-        match self {
-            ArithmeticType::Addition | ArithmeticType::Subtraction => 1,
-            ArithmeticType::Multiplication | ArithmeticType::Division => 2,
-        }
-    }
-}
-
-impl PartialOrd for ArithmeticType {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.weighted().cmp(&other.weighted()))
-    }
 }
 
 #[derive(Debug, PartialEq)]
@@ -99,7 +84,6 @@ pub(crate) enum AstNode {
         rhs: BAstNode,
         arithmetic_type: ArithmeticType,
     },
-
     Logical {
         lhs: BAstNode,
         rhs: BAstNode,
@@ -107,7 +91,12 @@ pub(crate) enum AstNode {
     },
     Boolean(bool),
     Paren(BAstNode),
-    EmptyExpression,
+    FunctionCall(Vec<BAstNode>),
+    FunctionDefinition {
+        name: String,
+        args: Vec<String>,
+        body: BAstNode,
+    },
 }
 
 type AstResult = Result<AstNode, ParserError>;
@@ -118,6 +107,24 @@ pub(crate) fn parse(tokens: Vec<Token>) -> Result<Vec<AstNode>, Vec<ParserError>
 
     while let Some(token) = cursor.next() {
         match token.token_type() {
+            TokenType::Return => {
+                // Syntax: return <expression>;
+                if let Some(expression) = parse_expression(&mut cursor, Precedence::Low).ok() {
+                    ast.push(AstNode::Return {
+                        expression: Box::new(expression),
+                    });
+                } else {
+                    panic!(
+                        "{}:{}: Expected expression after `return` at ",
+                        token.line_nbr(),
+                        token.char_nbr(),
+                    );
+                }
+            }
+            TokenType::Function => {
+                // Syntax: fn <ident>(args0..*) : <type> { <body> }
+                // TODO: Implement function parsing
+            }
             TokenType::Let => {
                 // Syntax: let <identifier> = <expression>;
                 if let Some(ident) =
@@ -226,9 +233,23 @@ fn parse_primary(tokens: &mut Cursor<Token>) -> AstResult {
     match x.token_type() {
         TokenType::Number(n) => Ok(AstNode::Number(*n)),
         TokenType::StringLiteral(s) => Ok(AstNode::StringLiteral(s.to_string())),
-        TokenType::Identifier(ident) => Ok(AstNode::Identifier {
-            ident: ident.to_string(),
-        }),
+        TokenType::Identifier(ident) => {
+            if tokens
+                .next_if(|t| *t.token_type() == TokenType::RightParen)
+                .is_some()
+            {
+                // Possible function invocation
+                // have to get all the values
+                todo!("Function Arguments")
+            } else {
+                Ok(AstNode::Identifier {
+                    ident: ident.to_string(),
+                })
+            }
+        }
+        // TokenType::Identifier(ident) => Ok(AstNode::Identifier {
+        //     ident: ident.to_string(),
+        // }),
         _ => panic!("Unexpected token: {:?}", x),
     }
 }
