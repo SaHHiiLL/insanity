@@ -222,8 +222,8 @@ pub mod Parser {
         use crate::lexer::TokenType;
         #[test]
         fn test_function_call() {
-            let input = String::from("let x = 1 + choose(1, 2);");
-            let tokens = lexer::Lexer::new(input).collect();
+            let input = "let x = 1 + choose(1, 2);".chars().collect::<Vec<_>>();
+            let tokens = lexer::Lexer::new(&input).collect();
             let ast = parse(tokens).unwrap();
             let expected = vec![AstNode::Assignment {
                 ident: "x".to_string(),
