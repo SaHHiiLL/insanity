@@ -118,7 +118,7 @@ mod test {
         let input = String::from("let x = 10;");
         let lexer = Lexer::from(input);
         let tokens = lexer.collect::<Vec<_>>();
-        let program = parse(dbg!(tokens));
+        let program = parse(tokens);
         assert!(program.is_ok());
     }
 
@@ -127,7 +127,7 @@ mod test {
         let input = String::from("let x = 10 + 20;");
         let lexer = Lexer::from(input);
         let tokens = lexer.collect::<Vec<_>>();
-        let program = dbg!(parse(tokens));
+        let program = parse(tokens);
         assert!(program.is_ok());
         let program = program.unwrap();
         let expected = vec![ast::AstNode::Assignment {
