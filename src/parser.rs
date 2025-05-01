@@ -74,6 +74,10 @@ pub mod Parser {
                 TokenType::Function => {
                     // Syntax: fn <ident>(args0..*) : <type> { <body> }
                     // TODO: Implement function parsing
+
+                    let Some(ident) = cursor.next() else {
+                        panic!("Expected an identifier after `fn`");
+                    };
                 }
                 TokenType::Let => {
                     // Syntax: let <identifier> = <expression>;
@@ -211,8 +215,14 @@ pub mod Parser {
                     let mut args = vec![];
                     while tokens.get().is_some() {
                         // TODO: handle the token.next() and unwraps
-                        if *tokens.get().unwrap().token_type() == TokenType::Comma { tokens.next(); continue;}
-                        if *tokens.get().unwrap().token_type() == TokenType::RightParen { tokens.next(); break; }
+                        if *tokens.get().unwrap().token_type() == TokenType::Comma {
+                            tokens.next();
+                            continue;
+                        }
+                        if *tokens.get().unwrap().token_type() == TokenType::RightParen {
+                            tokens.next();
+                            break;
+                        }
                         let arg = parse_expression(tokens, Precedence::Low)?;
                         args.push(Box::new(arg));
                     }
@@ -278,6 +288,40 @@ pub mod Parser {
                     }),
                     rhs: Box::new(AstNode::Number(3)),
                     arithmetic_type: ArithmeticType::Multiplication,
+                }),
+            }];
+            assert_eq!(ast, expected);
+        }
+
+        #[test]
+        fn test_deep_paren_nesting() {
+            let input = r#"let x = (1 + (2 * (82 / 2) + (4 * 3)));"#
+                .chars()
+                .collect::<Vec<_>>();
+            let tokens = lexer::Lexer::new(&input).collect();
+            let ast = parse(tokens).unwrap();
+            let expected = vec![AstNode::Assignment {
+                ident: "x".to_string(),
+                expression: Box::new(AstNode::Arithmetic {
+                    lhs: Box::new(AstNode::Number(1)),
+                    rhs: Box::new(AstNode::Arithmetic {
+                        lhs: Box::new(AstNode::Arithmetic {
+                            lhs: Box::new(AstNode::Number(2)),
+                            rhs: Box::new(AstNode::Arithmetic {
+                                lhs: Box::new(AstNode::Number(82)),
+                                rhs: Box::new(AstNode::Number(2)),
+                                arithmetic_type: ArithmeticType::Division,
+                            }),
+                            arithmetic_type: ArithmeticType::Multiplication,
+                        }),
+                        rhs: Box::new(AstNode::Arithmetic {
+                            lhs: Box::new(AstNode::Number(4)),
+                            rhs: Box::new(AstNode::Number(3)),
+                            arithmetic_type: ArithmeticType::Multiplication,
+                        }),
+                        arithmetic_type: ArithmeticType::Addition,
+                    }),
+                    arithmetic_type: ArithmeticType::Addition,
                 }),
             }];
             assert_eq!(ast, expected);
